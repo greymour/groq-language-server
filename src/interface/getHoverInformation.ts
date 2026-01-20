@@ -1,0 +1,199 @@
+import type { Hover, Position, MarkupContent } from 'vscode-languageserver';
+import { MarkupKind } from 'vscode-languageserver';
+import type { SyntaxNode } from '../parser/ASTTypes.js';
+import { nodeToRange } from '../parser/ASTTypes.js';
+import { getNamedNodeAtPosition } from '../parser/nodeUtils.js';
+import { toLSPRange } from '../utils/Range.js';
+import { GROQ_FUNCTIONS, GROQ_KEYWORDS } from './completionData.js';
+
+export function getHoverInformation(
+  _source: string,
+  root: SyntaxNode,
+  position: Position
+): Hover | null {
+  const node = getNamedNodeAtPosition(root, position);
+  if (!node) return null;
+
+  const info = getNodeHoverInfo(node);
+  if (!info) return null;
+
+  const range = nodeToRange(node);
+
+  return {
+    contents: info,
+    range: toLSPRange(range),
+  };
+}
+
+function getNodeHoverInfo(node: SyntaxNode): MarkupContent | null {
+  switch (node.type) {
+    case 'function_call': {
+      const nameNode = node.childForFieldName('name');
+      if (nameNode) {
+        return getFunctionHover(nameNode.text);
+      }
+      return null;
+    }
+
+    case 'identifier': {
+      if (node.parent?.type === 'function_call') {
+        const nameField = node.parent.childForFieldName('name');
+        if (nameField === node) {
+          return getFunctionHover(node.text);
+        }
+      }
+      return getIdentifierHover(node);
+    }
+
+    case 'everything':
+      return createMarkdown(
+        '**`*`** - Everything selector\n\nSelects all documents in the dataset.\n\n```groq\n*[_type == "post"]\n```'
+      );
+
+    case 'this':
+      return createMarkdown(
+        '**`@`** - Current item\n\nReferences the current item in the iteration scope.\n\n```groq\n*[_type == "post"]{ "title": @.title }\n```'
+      );
+
+    case 'parent':
+      return createMarkdown(
+        '**`^`** - Parent scope\n\nReferences the parent scope in nested queries.\n\n```groq\n*[_type == "author"]{ "posts": *[_type == "post" && author._ref == ^._id] }\n```'
+      );
+
+    case 'variable':
+      return createMarkdown(
+        `**\`${node.text}\`** - Query parameter\n\nA variable passed into the query at execution time.`
+      );
+
+    case 'pipe_expression':
+      return createMarkdown(
+        '**`|`** - Pipe operator\n\nPasses the result of the left expression to the right expression.\n\n```groq\n*[_type == "post"] | order(_createdAt desc)\n```'
+      );
+
+    case 'dereference_expression':
+      return createMarkdown(
+        '**`->`** - Dereference operator\n\nFollows a reference to fetch the referenced document.\n\n```groq\n*[_type == "post"]{ author-> }\n```'
+      );
+
+    case 'spread':
+      return createMarkdown(
+        '**`...`** - Spread operator\n\nIncludes all fields from the current document in a projection.\n\n```groq\n*[_type == "post"]{ ..., "authorName": author->name }\n```'
+      );
+
+    case 'subscript_expression': {
+      const indexField = node.childForFieldName('index');
+      const operatorField = node.childForFieldName('operator');
+      if (operatorField) {
+        if (operatorField.text === '..') {
+          return createMarkdown(
+            '**`..`** - Exclusive slice\n\nSelects a range of elements, excluding the end index.\n\n```groq\n*[_type == "post"][0..10] // Gets items 0-9\n```'
+          );
+        }
+        if (operatorField.text === '...') {
+          return createMarkdown(
+            '**`...`** - Inclusive slice\n\nSelects a range of elements, including the end index.\n\n```groq\n*[_type == "post"][0...10] // Gets items 0-10\n```'
+          );
+        }
+      }
+      if (!indexField && !operatorField) {
+        return createMarkdown(
+          '**Filter expression**\n\nFilters documents based on the condition inside brackets.\n\n```groq\n*[_type == "post" && published == true]\n```'
+        );
+      }
+      return null;
+    }
+
+    case 'projection':
+    case 'projection_expression':
+      return createMarkdown(
+        '**Projection**\n\nSelects which fields to return from documents.\n\n```groq\n*[_type == "post"]{\n  title,\n  "author": author->name,\n  _createdAt\n}\n```'
+      );
+
+    case 'asc_expression':
+      return createMarkdown(
+        '**`asc`** - Ascending order\n\nSorts results in ascending order (A-Z, 0-9, oldest first).\n\n```groq\n*[_type == "post"] | order(_createdAt asc)\n```'
+      );
+
+    case 'desc_expression':
+      return createMarkdown(
+        '**`desc`** - Descending order\n\nSorts results in descending order (Z-A, 9-0, newest first).\n\n```groq\n*[_type == "post"] | order(_createdAt desc)\n```'
+      );
+
+    case 'in_expression':
+      return createMarkdown(
+        '**`in`** - Membership check\n\nChecks if a value exists in an array or range.\n\n```groq\n*[_type in ["post", "article"]]\n```'
+      );
+
+    case 'match_expression':
+      return createMarkdown(
+        '**`match`** - Text search\n\nPerforms a full-text search match.\n\n```groq\n*[title match "hello*"]\n```'
+      );
+
+    case 'pair':
+      return createMarkdown(
+        '**`=>`** - Conditional pair\n\nUsed in `select()` to map conditions to values.\n\n```groq\nselect(\n  _type == "post" => "Post",\n  _type == "page" => "Page"\n)\n```'
+      );
+
+    case 'null':
+      return createMarkdown('**`null`** - Null value\n\nRepresents the absence of a value.');
+
+    case 'true':
+      return createMarkdown('**`true`** - Boolean true');
+
+    case 'false':
+      return createMarkdown('**`false`** - Boolean false');
+
+    case 'number':
+      return createMarkdown(`**Number**: \`${node.text}\``);
+
+    case 'string':
+      return createMarkdown(`**String**: \`${node.text}\``);
+
+    default:
+      return null;
+  }
+}
+
+function getFunctionHover(name: string): MarkupContent | null {
+  const fn = GROQ_FUNCTIONS.find((f) => f.name === name);
+  if (!fn) return null;
+
+  let markdown = `**${fn.name}**\n\n\`\`\`groq\n${fn.signature}\n\`\`\`\n\n${fn.description}`;
+
+  if (fn.parameters && fn.parameters.length > 0) {
+    markdown += `\n\n**Parameters:**\n${fn.parameters.map((p) => `- \`${p}\``).join('\n')}`;
+  }
+
+  return createMarkdown(markdown);
+}
+
+function getIdentifierHover(node: SyntaxNode): MarkupContent | null {
+  const text = node.text;
+
+  const keyword = GROQ_KEYWORDS.find((k) => k.label === text);
+  if (keyword) {
+    return createMarkdown(`**\`${text}\`** - Keyword\n\n${keyword.description}`);
+  }
+
+  if (text.startsWith('_')) {
+    const builtins: Record<string, string> = {
+      _id: 'Unique document identifier',
+      _type: 'Document type name',
+      _createdAt: 'Document creation timestamp',
+      _updatedAt: 'Document last update timestamp',
+      _rev: 'Document revision ID',
+    };
+    if (builtins[text]) {
+      return createMarkdown(`**\`${text}\`** - Built-in field\n\n${builtins[text]}`);
+    }
+  }
+
+  return null;
+}
+
+function createMarkdown(content: string): MarkupContent {
+  return {
+    kind: MarkupKind.Markdown,
+    value: content,
+  };
+}

@@ -1,0 +1,52 @@
+{
+  "name": "groq-language-server",
+  "version": "0.1.0",
+  "description": "Language Server Protocol implementation for the GROQ query language",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "groq-language-server": "./bin/groq-language-server.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "groq",
+    "sanity",
+    "language-server",
+    "lsp"
+  ],
+  "author": "Kurt Steigleder",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "lua",
+    "plugin",
+    "ftdetect",
+    "after"
+  ],
+  "dependencies": {
+    "tree-sitter": "^0.25.0",
+    "tree-sitter-groq": "file:../tree-sitter-groq",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.24.0",
+    "@types/node": "^20.11.0",
+    "eslint": "^8.57.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  }
+}
