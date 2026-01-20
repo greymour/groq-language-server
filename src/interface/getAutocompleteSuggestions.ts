@@ -59,8 +59,23 @@ function determineCompletionContext(
     return 'afterArrow';
   }
 
+  // Handle boundary cases where cursor is at end of a token
+  // and descendantForPosition returns source_file
+  if (charBefore === '[') {
+    return 'insideFilter';
+  }
+
+  if (charBefore === '{') {
+    return 'insideProjection';
+  }
+
+  // Check if we're right after 'everything' (*)
+  if (charBefore === '*' || source.trim() === '*') {
+    return 'afterEverything';
+  }
+
   if (node) {
-    if (node.type === 'everything' || (node.parent?.type === 'source_file' && source.trim() === '*')) {
+    if (node.type === 'everything') {
       return 'afterEverything';
     }
 
