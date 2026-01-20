@@ -15,6 +15,7 @@ import { getOutline } from '../interface/getOutline.js';
 import { getDefinition } from '../interface/getDefinition.js';
 import type { EmbeddedQuery } from '../embedded/findGroqTags.js';
 import { findGroqTags } from '../embedded/findGroqTags.js';
+import { SchemaLoader } from '../schema/SchemaLoader.js';
 
 export interface GroqLanguageServiceConfig {
   schemaEnabled?: boolean;
@@ -25,10 +26,24 @@ export class GroqLanguageService {
   private documentCache: DocumentCache;
   private embeddedQueryCache: Map<string, EmbeddedQuery[]> = new Map();
   private config: GroqLanguageServiceConfig;
+  private schemaLoader: SchemaLoader;
 
   constructor(config: GroqLanguageServiceConfig = {}) {
     this.documentCache = new DocumentCache();
     this.config = config;
+    this.schemaLoader = new SchemaLoader();
+
+    if (config.schemaPath) {
+      this.loadSchema(config.schemaPath);
+    }
+  }
+
+  private async loadSchema(schemaPath: string): Promise<void> {
+    await this.schemaLoader.loadFromPath(schemaPath);
+  }
+
+  getSchemaLoader(): SchemaLoader {
+    return this.schemaLoader;
   }
 
   updateDocument(document: TextDocument): void {
@@ -65,9 +80,9 @@ export class GroqLanguageService {
     const parseResult = this.documentCache.getParseResult(document.uri);
     if (!parseResult) {
       const result = this.documentCache.set(document);
-      return getAutocompleteSuggestions(document.getText(), result.tree.rootNode, position);
+      return getAutocompleteSuggestions(document.getText(), result.tree.rootNode, position, this.schemaLoader);
     }
-    return getAutocompleteSuggestions(document.getText(), parseResult.tree.rootNode, position);
+    return getAutocompleteSuggestions(document.getText(), parseResult.tree.rootNode, position, this.schemaLoader);
   }
 
   getHover(document: TextDocument, position: Position): Hover | null {
@@ -78,9 +93,9 @@ export class GroqLanguageService {
     const parseResult = this.documentCache.getParseResult(document.uri);
     if (!parseResult) {
       const result = this.documentCache.set(document);
-      return getHoverInformation(document.getText(), result.tree.rootNode, position);
+      return getHoverInformation(document.getText(), result.tree.rootNode, position, this.schemaLoader);
     }
-    return getHoverInformation(document.getText(), parseResult.tree.rootNode, position);
+    return getHoverInformation(document.getText(), parseResult.tree.rootNode, position, this.schemaLoader);
   }
 
   getDocumentSymbols(document: TextDocument): SymbolInformation[] {
@@ -178,7 +193,7 @@ export class GroqLanguageService {
     if (!query) return [];
 
     const embeddedPosition = this.toEmbeddedPosition(query, position);
-    return getAutocompleteSuggestions(query.content, query.parseResult.tree.rootNode, embeddedPosition);
+    return getAutocompleteSuggestions(query.content, query.parseResult.tree.rootNode, embeddedPosition, this.schemaLoader);
   }
 
   private getEmbeddedHover(document: TextDocument, position: Position): Hover | null {
@@ -186,7 +201,7 @@ export class GroqLanguageService {
     if (!query) return null;
 
     const embeddedPosition = this.toEmbeddedPosition(query, position);
-    const hover = getHoverInformation(query.content, query.parseResult.tree.rootNode, embeddedPosition);
+    const hover = getHoverInformation(query.content, query.parseResult.tree.rootNode, embeddedPosition, this.schemaLoader);
     if (hover?.range) {
       hover.range.start.line += query.range.start.line;
       hover.range.end.line += query.range.start.line;
@@ -236,6 +251,11 @@ export class GroqLanguageService {
   }
 
   updateConfig(config: Partial<GroqLanguageServiceConfig>): void {
+    const oldSchemaPath = this.config.schemaPath;
     this.config = { ...this.config, ...config };
+
+    if (config.schemaPath && config.schemaPath !== oldSchemaPath) {
+      this.loadSchema(config.schemaPath);
+    }
   }
 }

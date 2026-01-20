@@ -38,7 +38,16 @@ export class MessageProcessor {
     this.connection.onDefinition(this.handleDefinition.bind(this));
   }
 
-  private handleInitialize(_params: InitializeParams): InitializeResult {
+  private handleInitialize(params: InitializeParams): InitializeResult {
+    const initOptions = params.initializationOptions as {
+      schemaPath?: string;
+      schemaEnabled?: boolean;
+    } | undefined;
+
+    if (initOptions?.schemaPath) {
+      this.service.updateConfig({ schemaPath: initOptions.schemaPath });
+    }
+
     return {
       capabilities: {
         textDocumentSync: 1 as TextDocumentSyncKind,

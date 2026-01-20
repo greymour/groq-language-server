@@ -5,16 +5,19 @@ import { nodeToRange } from '../parser/ASTTypes.js';
 import { getNamedNodeAtPosition } from '../parser/nodeUtils.js';
 import { toLSPRange } from '../utils/Range.js';
 import { GROQ_FUNCTIONS, GROQ_KEYWORDS } from './completionData.js';
+import type { SchemaLoader } from '../schema/SchemaLoader.js';
+import { inferTypeContext } from '../schema/TypeInference.js';
 
 export function getHoverInformation(
   _source: string,
   root: SyntaxNode,
-  position: Position
+  position: Position,
+  schemaLoader?: SchemaLoader
 ): Hover | null {
   const node = getNamedNodeAtPosition(root, position);
   if (!node) return null;
 
-  const info = getNodeHoverInfo(node);
+  const info = getNodeHoverInfo(node, schemaLoader);
   if (!info) return null;
 
   const range = nodeToRange(node);
@@ -25,7 +28,7 @@ export function getHoverInformation(
   };
 }
 
-function getNodeHoverInfo(node: SyntaxNode): MarkupContent | null {
+function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader): MarkupContent | null {
   switch (node.type) {
     case 'function_call': {
       const nameNode = node.childForFieldName('name');
@@ -42,7 +45,7 @@ function getNodeHoverInfo(node: SyntaxNode): MarkupContent | null {
           return getFunctionHover(node.text);
         }
       }
-      return getIdentifierHover(node);
+      return getIdentifierHover(node, schemaLoader);
     }
 
     case 'everything':
@@ -167,8 +170,13 @@ function getFunctionHover(name: string): MarkupContent | null {
   return createMarkdown(markdown);
 }
 
-function getIdentifierHover(node: SyntaxNode): MarkupContent | null {
+function getIdentifierHover(node: SyntaxNode, schemaLoader?: SchemaLoader): MarkupContent | null {
   const text = node.text;
+
+  if (schemaLoader?.isLoaded()) {
+    const schemaHover = getSchemaFieldHover(node, text, schemaLoader);
+    if (schemaHover) return schemaHover;
+  }
 
   const keyword = GROQ_KEYWORDS.find((k) => k.label === text);
   if (keyword) {
@@ -189,6 +197,53 @@ function getIdentifierHover(node: SyntaxNode): MarkupContent | null {
   }
 
   return null;
+}
+
+function getSchemaFieldHover(
+  node: SyntaxNode,
+  fieldName: string,
+  schemaLoader: SchemaLoader
+): MarkupContent | null {
+  const context = inferTypeContext(node, schemaLoader);
+
+  if (context.type) {
+    const field = schemaLoader.getField(context.type.name, fieldName);
+    if (field) {
+      return formatSchemaFieldHover(field, context.type.name);
+    }
+  }
+
+  for (const typeName of context.documentTypes) {
+    const field = schemaLoader.getField(typeName, fieldName);
+    if (field) {
+      return formatSchemaFieldHover(field, typeName);
+    }
+  }
+
+  return null;
+}
+
+function formatSchemaFieldHover(
+  field: { name: string; type: string; isReference: boolean; referenceTargets?: string[]; isArray: boolean; arrayOf?: string[]; description?: string },
+  typeName: string
+): MarkupContent {
+  let typeDisplay = field.type;
+
+  if (field.isReference && field.referenceTargets?.length) {
+    typeDisplay = `reference → ${field.referenceTargets.join(' | ')}`;
+  } else if (field.isArray && field.arrayOf?.length) {
+    typeDisplay = `array<${field.arrayOf.join(' | ')}>`;
+  }
+
+  let markdown = `**\`${field.name}\`** - Schema field\n\n`;
+  markdown += `**Type:** \`${typeDisplay}\`\n\n`;
+  markdown += `**Document:** \`${typeName}\``;
+
+  if (field.description) {
+    markdown += `\n\n${field.description}`;
+  }
+
+  return createMarkdown(markdown);
 }
 
 function createMarkdown(content: string): MarkupContent {

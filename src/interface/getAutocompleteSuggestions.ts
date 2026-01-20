@@ -13,6 +13,9 @@ import {
   GROQ_FUNCTIONS,
 } from './completionData.js';
 import { CompletionItemKind } from 'vscode-languageserver';
+import type { SchemaLoader } from '../schema/SchemaLoader.js';
+import { inferTypeContext, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
+import type { ResolvedField } from '../schema/SchemaTypes.js';
 
 type CompletionContext =
   | 'empty'
@@ -29,10 +32,11 @@ type CompletionContext =
 export function getAutocompleteSuggestions(
   source: string,
   root: SyntaxNode,
-  position: Position
+  position: Position,
+  schemaLoader?: SchemaLoader
 ): CompletionItem[] {
   const context = determineCompletionContext(source, root, position);
-  return getCompletionsForContext(context, source, root, position);
+  return getCompletionsForContext(context, source, root, position, schemaLoader);
 }
 
 function determineCompletionContext(
@@ -74,6 +78,15 @@ function determineCompletionContext(
     return 'afterEverything';
   }
 
+  // Check text-based heuristics for incomplete expressions
+  const textBeforeCursor = source.substring(0, positionToOffset(source, position));
+  if (isInsideFilterBracket(textBeforeCursor)) {
+    return 'insideFilter';
+  }
+  if (isInsideProjectionBrace(textBeforeCursor)) {
+    return 'insideProjection';
+  }
+
   if (node) {
     if (node.type === 'everything') {
       return 'afterEverything';
@@ -105,13 +118,36 @@ function determineCompletionContext(
   return 'general';
 }
 
+function isInsideFilterBracket(text: string): boolean {
+  let bracketDepth = 0;
+  let braceDepth = 0;
+  for (const char of text) {
+    if (char === '[') bracketDepth++;
+    else if (char === ']') bracketDepth--;
+    else if (char === '{') braceDepth++;
+    else if (char === '}') braceDepth--;
+  }
+  return bracketDepth > 0 && braceDepth === 0;
+}
+
+function isInsideProjectionBrace(text: string): boolean {
+  let braceDepth = 0;
+  for (const char of text) {
+    if (char === '{') braceDepth++;
+    else if (char === '}') braceDepth--;
+  }
+  return braceDepth > 0;
+}
+
 function getCompletionsForContext(
   context: CompletionContext,
   source: string,
   root: SyntaxNode,
-  position: Position
+  position: Position,
+  schemaLoader?: SchemaLoader
 ): CompletionItem[] {
   const word = getWordAtPosition(source, position);
+  const node = getNodeAtPosition(root, position);
 
   switch (context) {
     case 'empty':
@@ -126,6 +162,8 @@ function getCompletionsForContext(
     case 'insideFilter':
       return [
         ...getFilterStartCompletions(),
+        ...getSchemaTypeCompletions(source, position, schemaLoader),
+        ...getSchemaFieldCompletions(node, schemaLoader),
         ...getKeywordCompletions(),
         ...getFunctionCompletions(),
         ...getVariableCompletions(root),
@@ -134,17 +172,22 @@ function getCompletionsForContext(
     case 'insideProjection':
       return [
         ...getProjectionCompletions(),
+        ...getSchemaFieldCompletions(node, schemaLoader),
         ...getFunctionCompletions(),
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
 
     case 'afterDot':
       return [
+        ...getSchemaFieldCompletions(node, schemaLoader),
         ...getFieldCompletions(),
         ...getSpecialCharCompletions().filter((c) => c.label === '@' || c.label === '^'),
       ];
 
     case 'afterArrow':
-      return getFieldCompletions();
+      return [
+        ...getReferenceFieldCompletions(node, schemaLoader),
+        ...getFieldCompletions(),
+      ];
 
     case 'afterPipe':
       return getPipeCompletions();
@@ -157,6 +200,7 @@ function getCompletionsForContext(
 
     case 'functionArgs':
       return [
+        ...getSchemaFieldCompletions(node, schemaLoader),
         ...getFieldCompletions(),
         ...getVariableCompletions(root),
       ];
@@ -208,4 +252,79 @@ function collectVariables(node: SyntaxNode, variables: Set<string>): void {
 export function getFunctionSignature(name: string): string | null {
   const fn = GROQ_FUNCTIONS.find((f) => f.name === name);
   return fn?.signature ?? null;
+}
+
+function getSchemaTypeCompletions(
+  source: string,
+  position: Position,
+  schemaLoader?: SchemaLoader
+): CompletionItem[] {
+  if (!schemaLoader?.isLoaded()) return [];
+
+  const textBeforeCursor = source.substring(0, positionToOffset(source, position));
+  const typeEqualPattern = /_type\s*==\s*["']?$/;
+  if (!typeEqualPattern.test(textBeforeCursor)) return [];
+
+  return schemaLoader.getDocumentTypeNames().map((typeName) => ({
+    label: `"${typeName}"`,
+    kind: CompletionItemKind.Value,
+    detail: 'Document type',
+    insertText: `"${typeName}"`,
+  }));
+}
+
+function getSchemaFieldCompletions(
+  node: SyntaxNode | null,
+  schemaLoader?: SchemaLoader
+): CompletionItem[] {
+  if (!schemaLoader?.isLoaded() || !node) return [];
+
+  const context = inferTypeContext(node, schemaLoader);
+  const fields = getAvailableFields(context, schemaLoader);
+
+  return fields.map((field) => resolvedFieldToCompletion(field));
+}
+
+function getReferenceFieldCompletions(
+  node: SyntaxNode | null,
+  schemaLoader?: SchemaLoader
+): CompletionItem[] {
+  if (!schemaLoader?.isLoaded() || !node) return [];
+
+  const derefExpr = findAncestorOfType(node, 'dereference_expression');
+  if (!derefExpr) return [];
+
+  const baseNode = getFieldNode(derefExpr, 'base');
+  if (!baseNode) return [];
+
+  const context = inferTypeContext(baseNode, schemaLoader);
+  if (!context.field?.isReference) return [];
+
+  const fields = getReferenceTargetFields(context.field, schemaLoader);
+  return fields.map((field) => resolvedFieldToCompletion(field));
+}
+
+function resolvedFieldToCompletion(field: ResolvedField): CompletionItem {
+  let detail = field.type;
+  if (field.isReference && field.referenceTargets?.length) {
+    detail = `reference → ${field.referenceTargets.join(' | ')}`;
+  } else if (field.isArray && field.arrayOf?.length) {
+    detail = `array<${field.arrayOf.join(' | ')}>`;
+  }
+
+  return {
+    label: field.name,
+    kind: CompletionItemKind.Field,
+    detail,
+    documentation: field.description,
+  };
+}
+
+function positionToOffset(source: string, position: Position): number {
+  const lines = source.split('\n');
+  let offset = 0;
+  for (let i = 0; i < position.line && i < lines.length; i++) {
+    offset += lines[i].length + 1;
+  }
+  return offset + position.character;
 }

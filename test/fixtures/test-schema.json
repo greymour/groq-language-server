@@ -1,0 +1,108 @@
+{
+  "types": [
+    {
+      "name": "post",
+      "type": "document",
+      "title": "Blog Post",
+      "description": "A blog post document",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "title": "Title",
+          "description": "The title of the post"
+        },
+        {
+          "name": "slug",
+          "type": "slug",
+          "title": "Slug",
+          "description": "URL-friendly identifier"
+        },
+        {
+          "name": "content",
+          "type": "array",
+          "title": "Content",
+          "description": "The main content blocks",
+          "of": [
+            { "type": "block" },
+            { "type": "image" }
+          ]
+        },
+        {
+          "name": "author",
+          "type": "reference",
+          "title": "Author",
+          "description": "The post author",
+          "to": [
+            { "type": "author" }
+          ]
+        },
+        {
+          "name": "categories",
+          "type": "array",
+          "title": "Categories",
+          "of": [
+            {
+              "type": "reference",
+              "to": [{ "type": "category" }]
+            }
+          ]
+        },
+        {
+          "name": "publishedAt",
+          "type": "datetime",
+          "title": "Published At",
+          "description": "Publication date and time"
+        }
+      ]
+    },
+    {
+      "name": "author",
+      "type": "document",
+      "title": "Author",
+      "description": "An author profile",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "title": "Name",
+          "description": "The author's full name"
+        },
+        {
+          "name": "bio",
+          "type": "text",
+          "title": "Biography",
+          "description": "Short biography"
+        },
+        {
+          "name": "image",
+          "type": "image",
+          "title": "Profile Image"
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "title": "Email",
+          "description": "Contact email address"
+        }
+      ]
+    },
+    {
+      "name": "category",
+      "type": "document",
+      "title": "Category",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "title": "Title"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "title": "Description"
+        }
+      ]
+    }
+  ]
+}
