@@ -172,6 +172,10 @@ export class GroqLanguageService {
 
     const allDiagnostics: Diagnostic[] = [];
     for (const query of queries) {
+      // Skip diagnostics for queries with interpolations - we can't fully validate them
+      if (query.hasInterpolations) {
+        continue;
+      }
       const diagnostics = getDiagnostics(query.parseResult);
       for (const diag of diagnostics) {
         diag.range.start.line += query.range.start.line;

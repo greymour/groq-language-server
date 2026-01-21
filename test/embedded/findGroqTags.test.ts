@@ -58,6 +58,27 @@ describe('findGroqTags', () => {
     expect(tags[0].range.start.line).toBe(0);
     expect(tags[0].range.end.line).toBe(5);
   });
+
+  it('finds /* groq */ comment tagged template literals', () => {
+    const source = `
+      const query = /* groq */ \`*[_type == "post"]\`;
+    `;
+    const tags = findGroqTags(source);
+    expect(tags).toHaveLength(1);
+    expect(tags[0].content).toBe('*[_type == "post"]');
+  });
+
+  it('finds /* groq */ with multiline content', () => {
+    const source = `export const fragment = /* groq */ \`
+...,
+storiesContent[] {
+  ...,
+},
+\`;`;
+    const tags = findGroqTags(source);
+    expect(tags).toHaveLength(1);
+    expect(tags[0].content).toContain('storiesContent[]');
+  });
 });
 
 describe('isInsideGroqTag', () => {

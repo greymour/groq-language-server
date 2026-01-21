@@ -196,7 +196,39 @@ function getIdentifierHover(node: SyntaxNode, schemaLoader?: SchemaLoader): Mark
     }
   }
 
-  return null;
+  return getContextualIdentifierHover(node, text);
+}
+
+function getContextualIdentifierHover(node: SyntaxNode, text: string): MarkupContent | null {
+  const parent = node.parent;
+
+  if (parent?.type === 'subscript_expression') {
+    const baseField = parent.childForFieldName('base');
+    if (baseField === node) {
+      return createMarkdown(`**\`${text}\`** - Field access\n\nAccesses the \`${text}\` field, followed by array filter/slice.`);
+    }
+  }
+
+  if (parent?.type === 'access_expression') {
+    return createMarkdown(`**\`${text}\`** - Field access\n\nAccesses the \`${text}\` field from the current scope.`);
+  }
+
+  if (parent?.type === 'dereference_expression') {
+    return createMarkdown(`**\`${text}\`** - Reference field\n\nAccesses the \`${text}\` reference field for dereferencing.`);
+  }
+
+  if (parent?.type === 'projection' || parent?.type === 'projection_expression') {
+    return createMarkdown(`**\`${text}\`** - Projection field\n\nIncludes the \`${text}\` field in the projection output.`);
+  }
+
+  if (parent?.type === 'pair') {
+    const keyField = parent.childForFieldName('key');
+    if (keyField === node) {
+      return createMarkdown(`**\`${text}\`** - Projection alias\n\nDefines \`${text}\` as an alias for the computed value.`);
+    }
+  }
+
+  return createMarkdown(`**\`${text}\`** - Field\n\nField identifier in the query.`);
 }
 
 function getSchemaFieldHover(
