@@ -292,7 +292,7 @@ function getSchemaFieldCompletions(
   if (!context) return [];
 
   const fields = getAvailableFields(context, schemaLoader);
-  return fields.map((field) => resolvedFieldToCompletion(field));
+  return fields.map((field, index) => resolvedFieldToCompletion(field, index));
 }
 
 function getReferenceFieldCompletions(
@@ -314,7 +314,7 @@ function getReferenceFieldCompletions(
   return fields.map((field) => resolvedFieldToCompletion(field));
 }
 
-function resolvedFieldToCompletion(field: ResolvedField): CompletionItem {
+function resolvedFieldToCompletion(field: ResolvedField, index: number = 0): CompletionItem {
   let detail = field.type;
   if (field.isReference && field.referenceTargets?.length) {
     detail = `reference → ${field.referenceTargets.join(' | ')}`;
@@ -327,6 +327,7 @@ function resolvedFieldToCompletion(field: ResolvedField): CompletionItem {
     kind: CompletionItemKind.Field,
     detail,
     documentation: field.description,
+    sortText: `0-${String(index).padStart(4, '0')}-${field.name}`,
   };
 }
 

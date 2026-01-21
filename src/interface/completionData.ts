@@ -188,7 +188,7 @@ export const SPECIAL_CHARS = [
 ];
 
 export function getFunctionCompletions(): CompletionItem[] {
-  return GROQ_FUNCTIONS.map((fn) => ({
+  return GROQ_FUNCTIONS.map((fn, index) => ({
     label: fn.name,
     kind: CompletionItemKind.Function,
     detail: fn.signature,
@@ -197,14 +197,16 @@ export function getFunctionCompletions(): CompletionItem[] {
       ? `${fn.name}($1)`
       : `${fn.name}()`,
     insertTextFormat: 2,
+    sortText: `3-${String(index).padStart(4, '0')}-${fn.name}`,
   }));
 }
 
 export function getKeywordCompletions(): CompletionItem[] {
-  return GROQ_KEYWORDS.map((kw) => ({
+  return GROQ_KEYWORDS.map((kw, index) => ({
     label: kw.label,
     kind: CompletionItemKind.Keyword,
     documentation: kw.description,
+    sortText: `4-${String(index).padStart(4, '0')}-${kw.label}`,
   }));
 }
 
@@ -265,31 +267,37 @@ export function getProjectionCompletions(): CompletionItem[] {
       kind: CompletionItemKind.Snippet,
       detail: 'Spread all fields',
       documentation: 'Include all fields from the document',
+      sortText: '1-0000-...',
     },
     {
       label: '_id',
       kind: CompletionItemKind.Field,
       detail: 'Document ID',
+      sortText: '2-0000-_id',
     },
     {
       label: '_type',
       kind: CompletionItemKind.Field,
       detail: 'Document type',
+      sortText: '2-0001-_type',
     },
     {
       label: '_createdAt',
       kind: CompletionItemKind.Field,
       detail: 'Creation timestamp',
+      sortText: '2-0002-_createdAt',
     },
     {
       label: '_updatedAt',
       kind: CompletionItemKind.Field,
       detail: 'Last update timestamp',
+      sortText: '2-0003-_updatedAt',
     },
     {
       label: '_rev',
       kind: CompletionItemKind.Field,
       detail: 'Document revision',
+      sortText: '2-0004-_rev',
     },
   ];
 }
