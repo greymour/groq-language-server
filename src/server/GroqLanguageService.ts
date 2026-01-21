@@ -13,7 +13,7 @@ import { getAutocompleteSuggestions } from '../interface/getAutocompleteSuggesti
 import { getHoverInformation } from '../interface/getHoverInformation.js';
 import { getOutline } from '../interface/getOutline.js';
 import { getDefinition } from '../interface/getDefinition.js';
-import type { EmbeddedQuery } from '../embedded/findGroqTags.js';
+import type { EmbeddedQuery, InterpolationRange } from '../embedded/findGroqTags.js';
 import { findGroqTags } from '../embedded/findGroqTags.js';
 import { SchemaLoader } from '../schema/SchemaLoader.js';
 
@@ -172,12 +172,13 @@ export class GroqLanguageService {
 
     const allDiagnostics: Diagnostic[] = [];
     for (const query of queries) {
-      // Skip diagnostics for queries with interpolations - we can't fully validate them
-      if (query.hasInterpolations) {
-        continue;
-      }
       const diagnostics = getDiagnostics(query.parseResult);
       for (const diag of diagnostics) {
+        // Skip diagnostics that overlap with interpolation replacement positions
+        if (this.overlapsWithInterpolation(diag.range, query.interpolationRanges)) {
+          continue;
+        }
+
         diag.range.start.line += query.range.start.line;
         diag.range.end.line += query.range.start.line;
         if (diag.range.start.line === query.range.start.line) {
@@ -190,6 +191,39 @@ export class GroqLanguageService {
       }
     }
     return allDiagnostics;
+  }
+
+  private overlapsWithInterpolation(
+    diagRange: { start: Position; end: Position },
+    interpolationRanges: InterpolationRange[]
+  ): boolean {
+    for (const interpRange of interpolationRanges) {
+      if (this.rangesOverlap(diagRange, interpRange)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private rangesOverlap(
+    a: { start: Position; end: Position },
+    b: { start: Position; end: Position }
+  ): boolean {
+    // Check if range a ends before range b starts
+    if (
+      a.end.line < b.start.line ||
+      (a.end.line === b.start.line && a.end.character <= b.start.character)
+    ) {
+      return false;
+    }
+    // Check if range b ends before range a starts
+    if (
+      b.end.line < a.start.line ||
+      (b.end.line === a.start.line && b.end.character <= a.start.character)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   private getEmbeddedCompletions(document: TextDocument, position: Position): CompletionItem[] {

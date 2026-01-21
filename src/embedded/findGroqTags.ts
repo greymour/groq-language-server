@@ -1,11 +1,17 @@
 import type { ParseResult, Range, Position } from '../parser/ASTTypes.js';
 import { getSharedParser } from '../parser/GroqParser.js';
 
+export interface InterpolationRange {
+  start: Position;
+  end: Position;
+}
+
 export interface EmbeddedQuery {
   content: string;
   range: Range;
   parseResult: ParseResult;
   hasInterpolations: boolean;
+  interpolationRanges: InterpolationRange[];
 }
 
 interface TagLocation {
@@ -20,22 +26,59 @@ export function findGroqTags(source: string): EmbeddedQuery[] {
 
   return tagLocations.map((loc) => {
     const hasInterpolations = /\$\{[^}]*\}/.test(loc.content);
-    let sanitized = sanitizeInterpolations(loc.content);
-    if (isFragment(sanitized)) {
-      sanitized = wrapFragment(sanitized);
-    }
+    const { sanitized, interpolationRanges } = sanitizeInterpolations(loc.content);
+    const finalContent = isFragment(sanitized) ? wrapFragment(sanitized) : sanitized;
     return {
       content: loc.content,
       range: { start: loc.start, end: loc.end },
-      parseResult: parser.parse(sanitized),
+      parseResult: parser.parse(finalContent),
       hasInterpolations,
+      interpolationRanges,
     };
   });
 }
 
-function sanitizeInterpolations(content: string): string {
-  // Replace ${...} interpolations with spread operator, which is valid in most GROQ contexts
-  return content.replace(/\$\{[^}]*\}/g, '...');
+interface SanitizeResult {
+  sanitized: string;
+  interpolationRanges: InterpolationRange[];
+}
+
+function sanitizeInterpolations(content: string): SanitizeResult {
+  const interpolationRanges: InterpolationRange[] = [];
+  const regex = /\$\{[^}]*\}/g;
+  let result = '';
+  let lastIndex = 0;
+  let currentLine = 0;
+  let currentChar = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(content)) !== null) {
+    const before = content.slice(lastIndex, match.index);
+    result += before;
+
+    // Update position tracking for the content before the match
+    for (const char of before) {
+      if (char === '\n') {
+        currentLine++;
+        currentChar = 0;
+      } else {
+        currentChar++;
+      }
+    }
+
+    // Record where the replacement `...` will be in the sanitized output
+    const startPos: Position = { line: currentLine, character: currentChar };
+    result += '...';
+    currentChar += 3;
+    const endPos: Position = { line: currentLine, character: currentChar };
+
+    interpolationRanges.push({ start: startPos, end: endPos });
+    lastIndex = match.index + match[0].length;
+  }
+
+  result += content.slice(lastIndex);
+
+  return { sanitized: result, interpolationRanges };
 }
 
 function isFragment(content: string): boolean {
