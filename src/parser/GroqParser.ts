@@ -3,24 +3,15 @@ import type { Tree, SyntaxNode, ParseResult, ParseError, Range } from './ASTType
 import { nodeToRange } from './ASTTypes.js';
 import { collectAllErrors } from './nodeUtils.js';
 
-let GroqLanguageModule: Parser.Language | null = null;
-
-function getGroqLanguage(): Parser.Language {
-  if (!GroqLanguageModule) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    // Pass the whole module object, not just .language - tree-sitter's setLanguage
-    // needs to attach nodeSubclasses to the object, which fails on raw NAPI Externals
-    GroqLanguageModule = require('tree-sitter-groq');
-  }
-  return GroqLanguageModule!;
-}
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const GroqLanguage = require('tree-sitter-groq') as Parser.Language;
 
 export class GroqParser {
   private parser: Parser;
 
   constructor() {
     this.parser = new Parser();
-    this.parser.setLanguage(getGroqLanguage());
+    this.parser.setLanguage(GroqLanguage);
   }
 
   parse(source: string, previousTree?: Tree): ParseResult {
@@ -116,7 +107,7 @@ export class GroqParser {
   }
 
   getLanguage(): Parser.Language {
-    return getGroqLanguage();
+    return GroqLanguage;
   }
 }
 
