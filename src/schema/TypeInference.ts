@@ -90,7 +90,25 @@ export function inferTypeContext(
     documentTypes: [],
   };
 
-  // First, check for explicit _type filter
+  // Check nested projections first (most specific context)
+  // Check if we're inside a nested field projection (e.g., `video { }`)
+  const nestedFieldType = inferNestedFieldType(node, schemaLoader);
+  if (nestedFieldType) {
+    context.type = nestedFieldType;
+    context.documentTypes = [nestedFieldType.name];
+    return finalizeContext(context, node, schemaLoader);
+  }
+
+  // Check if we're inside a projection on an array field access (e.g., `fieldName[] { }`)
+  const arrayFieldType = inferArrayFieldType(node, schemaLoader);
+  if (arrayFieldType) {
+    context.type = arrayFieldType;
+    context.documentTypes = [arrayFieldType.name];
+    context.isArray = true;
+    return finalizeContext(context, node, schemaLoader);
+  }
+
+  // Fall back to explicit _type filter
   const typeFilter = findTypeFilter(node);
   if (typeFilter) {
     const typeName = extractTypeName(typeFilter);
@@ -100,19 +118,18 @@ export function inferTypeContext(
     }
   }
 
-  // Check if we're inside a projection on an array field access (e.g., `fieldName[] { }`)
-  if (!context.type) {
-    const arrayFieldType = inferArrayFieldType(node, schemaLoader);
-    if (arrayFieldType) {
-      context.type = arrayFieldType;
-      context.documentTypes = [arrayFieldType.name];
-      context.isArray = true;
-    }
-  }
-
   if (!context.type) {
     context.documentTypes = schemaLoader.getDocumentTypeNames();
   }
+
+  return finalizeContext(context, node, schemaLoader);
+}
+
+function finalizeContext(
+  context: InferredContext,
+  node: SyntaxNode,
+  schemaLoader: SchemaLoader
+): InferredContext {
 
   const accessExpr = findAncestorOfType(node, ['access_expression', 'dereference_expression']);
   if (accessExpr && context.type) {
@@ -191,6 +208,157 @@ function inferArrayFieldType(
         return itemType;
       }
     }
+  }
+
+  return null;
+}
+
+function inferNestedFieldType(
+  node: SyntaxNode,
+  schemaLoader: SchemaLoader
+): ResolvedType | null {
+  // Find the projection we're inside - could be the node itself or an ancestor
+  let projection: SyntaxNode | null = null;
+  if (node.type === 'projection') {
+    projection = node;
+  } else {
+    projection = findAncestorOfType(node, ['projection']);
+  }
+
+  if (!projection || !projection.parent) return null;
+
+  // Check if the projection's parent is a projection_expression
+  const projExpr = projection.parent;
+  if (projExpr.type !== 'projection_expression') return null;
+
+  // Get the base of the projection_expression
+  const baseNode = getFieldNode(projExpr, 'base');
+  if (!baseNode) return null;
+
+  // If the base is an identifier, it's a simple field projection like `video { }`
+  if (baseNode.type === 'identifier') {
+    const fieldName = baseNode.text;
+
+    // Get the parent type context by looking at the outer projection
+    const parentContext = getParentTypeContext(projExpr, schemaLoader);
+    if (!parentContext) return null;
+
+    // Look up the field in the parent type
+    const field = schemaLoader.getField(parentContext.name, fieldName);
+    if (!field) return null;
+
+    // If it's a reference field, return the reference target type
+    if (field.isReference && field.referenceTargets?.length) {
+      const targetTypeName = field.referenceTargets[0];
+      return schemaLoader.getType(targetTypeName) ?? null;
+    }
+
+    // If it's an inline/object field, try to get its type
+    if (field.type && field.type !== 'object') {
+      return schemaLoader.getType(field.type) ?? null;
+    }
+  }
+
+  return null;
+}
+
+function getParentTypeContext(
+  projExpr: SyntaxNode,
+  schemaLoader: SchemaLoader
+): ResolvedType | null {
+  // Walk up to find the parent projection_expression or subscript_expression
+  let current: SyntaxNode | null = projExpr.parent;
+
+  while (current) {
+    if (current.type === 'projection') {
+      const parentProjExpr = current.parent;
+      if (parentProjExpr?.type === 'projection_expression') {
+        const baseNode = getFieldNode(parentProjExpr, 'base');
+
+        // Handle simple field projection like `video { }`
+        if (baseNode?.type === 'identifier') {
+          const fieldName = baseNode.text;
+          // Recursively get parent context
+          const grandparentContext = getParentTypeContext(parentProjExpr, schemaLoader);
+          if (grandparentContext) {
+            const field = schemaLoader.getField(grandparentContext.name, fieldName);
+            if (field) {
+              // Reference field - return target type
+              if (field.isReference && field.referenceTargets?.length) {
+                return schemaLoader.getType(field.referenceTargets[0]) ?? null;
+              }
+              // Inline/object field - return its type
+              if (field.type && field.type !== 'object') {
+                return schemaLoader.getType(field.type) ?? null;
+              }
+            }
+          }
+          // Fallback: search all types for this field
+          for (const typeName of schemaLoader.getTypeNames()) {
+            const field = schemaLoader.getField(typeName, fieldName);
+            if (field) {
+              if (field.isReference && field.referenceTargets?.length) {
+                return schemaLoader.getType(field.referenceTargets[0]) ?? null;
+              }
+              if (field.type && field.type !== 'object') {
+                return schemaLoader.getType(field.type) ?? null;
+              }
+            }
+          }
+        }
+
+        if (baseNode?.type === 'subscript_expression') {
+          // Check for type filter in the subscript
+          const indexNode = getFieldNode(baseNode, 'index');
+          if (indexNode) {
+            const typeComparison = findTypeComparison(indexNode);
+            if (typeComparison) {
+              const typeName = extractTypeName(typeComparison);
+              if (typeName) {
+                return schemaLoader.getType(typeName) ?? null;
+              }
+            }
+          }
+
+          // Check if it's an array field access like `fieldName[]`
+          const arrayBase = getFieldNode(baseNode, 'base');
+          if (arrayBase?.type === 'identifier') {
+            const fieldName = arrayBase.text;
+            // Recursively get parent context
+            const grandparentContext = getParentTypeContext(parentProjExpr, schemaLoader);
+            if (grandparentContext) {
+              const field = schemaLoader.getField(grandparentContext.name, fieldName);
+              if (field?.isArray && field.arrayOf?.length) {
+                return schemaLoader.getType(field.arrayOf[0]) ?? null;
+              }
+            }
+            // Fallback: search all types
+            for (const typeName of schemaLoader.getTypeNames()) {
+              const field = schemaLoader.getField(typeName, fieldName);
+              if (field?.isArray && field.arrayOf?.length) {
+                return schemaLoader.getType(field.arrayOf[0]) ?? null;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Check for type filter at this level
+    if (current.type === 'subscript_expression') {
+      const indexNode = getFieldNode(current, 'index');
+      if (indexNode) {
+        const typeComparison = findTypeComparison(indexNode);
+        if (typeComparison) {
+          const typeName = extractTypeName(typeComparison);
+          if (typeName) {
+            return schemaLoader.getType(typeName) ?? null;
+          }
+        }
+      }
+    }
+
+    current = current.parent;
   }
 
   return null;
