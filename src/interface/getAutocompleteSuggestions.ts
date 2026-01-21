@@ -14,7 +14,7 @@ import {
 } from './completionData.js';
 import { CompletionItemKind } from 'vscode-languageserver';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
+import { inferTypeContext, inferTypeContextFromText, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
 import type { ResolvedField } from '../schema/SchemaTypes.js';
 
 type CompletionContext =
@@ -163,7 +163,7 @@ function getCompletionsForContext(
       return [
         ...getFilterStartCompletions(),
         ...getSchemaTypeCompletions(source, position, schemaLoader),
-        ...getSchemaFieldCompletions(node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
         ...getKeywordCompletions(),
         ...getFunctionCompletions(),
         ...getVariableCompletions(root),
@@ -172,13 +172,13 @@ function getCompletionsForContext(
     case 'insideProjection':
       return [
         ...getProjectionCompletions(),
-        ...getSchemaFieldCompletions(node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
         ...getFunctionCompletions(),
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
 
     case 'afterDot':
       return [
-        ...getSchemaFieldCompletions(node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
         ...getFieldCompletions(),
         ...getSpecialCharCompletions().filter((c) => c.label === '@' || c.label === '^'),
       ];
@@ -200,7 +200,7 @@ function getCompletionsForContext(
 
     case 'functionArgs':
       return [
-        ...getSchemaFieldCompletions(node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
         ...getFieldCompletions(),
         ...getVariableCompletions(root),
       ];
@@ -274,14 +274,24 @@ function getSchemaTypeCompletions(
 }
 
 function getSchemaFieldCompletions(
+  source: string,
+  position: Position,
   node: SyntaxNode | null,
   schemaLoader?: SchemaLoader
 ): CompletionItem[] {
-  if (!schemaLoader?.isLoaded() || !node) return [];
+  if (!schemaLoader?.isLoaded()) return [];
 
-  const context = inferTypeContext(node, schemaLoader);
+  // Try AST-based inference first
+  let context = node ? inferTypeContext(node, schemaLoader) : null;
+
+  // If AST-based inference didn't find a specific type, try text-based inference
+  if (!context?.type) {
+    context = inferTypeContextFromText(source, position, schemaLoader);
+  }
+
+  if (!context) return [];
+
   const fields = getAvailableFields(context, schemaLoader);
-
   return fields.map((field) => resolvedFieldToCompletion(field));
 }
 
