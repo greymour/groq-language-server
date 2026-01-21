@@ -1,0 +1,169 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GROQ",
+  "scopeName": "source.groq",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#constants" },
+    { "include": "#keywords" },
+    { "include": "#operators" },
+    { "include": "#functions" },
+    { "include": "#variables" },
+    { "include": "#special" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.groq",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.groq",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.groq",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.groq",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.groq",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.groq",
+          "match": "\\b-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.true.groq",
+          "match": "\\btrue\\b"
+        },
+        {
+          "name": "constant.language.boolean.false.groq",
+          "match": "\\bfalse\\b"
+        },
+        {
+          "name": "constant.language.null.groq",
+          "match": "\\bnull\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.operator.logical.groq",
+          "match": "\\b(in|match)\\b"
+        },
+        {
+          "name": "keyword.other.order.groq",
+          "match": "\\b(asc|desc)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.groq",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.logical.groq",
+          "match": "(&&|\\|\\||!)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.groq",
+          "match": "(\\+|-|\\*|/|%|\\*\\*)"
+        },
+        {
+          "name": "keyword.operator.pipe.groq",
+          "match": "\\|"
+        },
+        {
+          "name": "keyword.operator.dereference.groq",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.arrow.groq",
+          "match": "=>"
+        },
+        {
+          "name": "keyword.operator.spread.groq",
+          "match": "\\.{2,3}"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.groq",
+          "match": "\\b(count|defined|length|references|coalesce|select|order|score|boost|now|identity|lower|upper|round|string|dateTime|path)\\s*(?=\\()"
+        },
+        {
+          "name": "entity.name.function.namespace.groq",
+          "match": "\\b(global|pt|geo|math|array|string|sanity)::"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.groq",
+          "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+    "special": {
+      "patterns": [
+        {
+          "name": "variable.language.everything.groq",
+          "match": "\\*"
+        },
+        {
+          "name": "variable.language.this.groq",
+          "match": "@"
+        },
+        {
+          "name": "variable.language.parent.groq",
+          "match": "\\^"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.property.builtin.groq",
+          "match": "\\b_(id|type|createdAt|updatedAt|rev|key|ref)\\b"
+        },
+        {
+          "name": "variable.other.property.groq",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

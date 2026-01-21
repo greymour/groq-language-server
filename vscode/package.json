@@ -1,0 +1,97 @@
+{
+  "name": "groq-vscode",
+  "displayName": "GROQ Language Support",
+  "description": "Language support for GROQ (Graph-Relational Object Queries) - Sanity's query language",
+  "version": "0.1.0",
+  "publisher": "sanity",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/groq-language-server"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "groq",
+    "sanity",
+    "query",
+    "cms"
+  ],
+  "activationEvents": [
+    "onLanguage:groq",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "groq",
+        "aliases": [
+          "GROQ",
+          "groq"
+        ],
+        "extensions": [
+          ".groq"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "groq",
+        "scopeName": "source.groq",
+        "path": "./syntaxes/groq.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "GROQ",
+      "properties": {
+        "groq.schemaPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Sanity schema JSON file for schema-aware completions"
+        },
+        "groq.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the GROQ language server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "prebuild": "cd .. && npm run build",
+    "build": "npm run build:extension && npm run build:server",
+    "build:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "build:server": "rm -rf server && mkdir -p server/node_modules && cp -r ../dist server/ && cp -r ../node_modules/tree-sitter server/node_modules/ && cp -r ../node_modules/tree-sitter-groq server/node_modules/ && cp -r ../node_modules/node-gyp-build server/node_modules/ 2>/dev/null || true && cp -r ../node_modules/vscode-languageserver server/node_modules/ && cp -r ../node_modules/vscode-languageserver-textdocument server/node_modules/ && cp -r ../node_modules/vscode-languageserver-protocol server/node_modules/ && cp -r ../node_modules/vscode-languageserver-types server/node_modules/ && cp -r ../node_modules/vscode-jsonrpc server/node_modules/",
+    "postbuild:server": "echo '#!/usr/bin/env node\nconst { startServer } = require(\"./dist/server\");\nstartServer({ method: \"stdio\" });' > server/groq-language-server.js",
+    "watch": "npm run build:extension -- --watch",
+    "package": "npm run build && vsce package",
+    "publish": "vsce publish"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.19.0",
+    "typescript": "^5.3.3"
+  }
+}
