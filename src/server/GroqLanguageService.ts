@@ -64,12 +64,13 @@ export class GroqLanguageService {
       return this.getEmbeddedDiagnostics(document);
     }
 
+    const source = document.getText();
     const parseResult = this.documentCache.getParseResult(document.uri);
     if (!parseResult) {
       const result = this.documentCache.set(document);
-      return getDiagnostics(result);
+      return getDiagnostics(result, { schemaLoader: this.schemaLoader, source });
     }
-    return getDiagnostics(parseResult);
+    return getDiagnostics(parseResult, { schemaLoader: this.schemaLoader, source });
   }
 
   getCompletions(document: TextDocument, position: Position): CompletionItem[] {
@@ -172,7 +173,10 @@ export class GroqLanguageService {
 
     const allDiagnostics: Diagnostic[] = [];
     for (const query of queries) {
-      const diagnostics = getDiagnostics(query.parseResult);
+      const diagnostics = getDiagnostics(query.parseResult, {
+        schemaLoader: this.schemaLoader,
+        source: query.content,
+      });
       for (const diag of diagnostics) {
         // Skip diagnostics that overlap with interpolation replacement positions
         if (this.overlapsWithInterpolation(diag.range, query.interpolationRanges)) {

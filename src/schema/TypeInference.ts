@@ -200,6 +200,7 @@ function findTypeFilter(node: SyntaxNode): SyntaxNode | null {
   let current: SyntaxNode | null = node;
 
   while (current) {
+    // Direct subscript_expression ancestor
     if (current.type === 'subscript_expression') {
       const indexNode = getFieldNode(current, 'index');
       if (indexNode) {
@@ -209,6 +210,21 @@ function findTypeFilter(node: SyntaxNode): SyntaxNode | null {
         }
       }
     }
+
+    // When inside a projection, check the sibling subscript_expression
+    if (current.type === 'projection' && current.parent?.type === 'projection_expression') {
+      const baseNode = getFieldNode(current.parent, 'base');
+      if (baseNode?.type === 'subscript_expression') {
+        const indexNode = getFieldNode(baseNode, 'index');
+        if (indexNode) {
+          const typeComparison = findTypeComparison(indexNode);
+          if (typeComparison) {
+            return typeComparison;
+          }
+        }
+      }
+    }
+
     current = current.parent;
   }
 
