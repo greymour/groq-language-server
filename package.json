@@ -9,12 +9,13 @@
   },
   "scripts": {
     "build": "tsup",
+    "build:nvim": "npm run build",
+    "build:vscode": "cd editors/vscode && npm run build",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "groq",
@@ -30,10 +31,7 @@
   "files": [
     "dist",
     "bin",
-    "lua",
-    "plugin",
-    "ftdetect",
-    "after"
+    "editors/nvim"
   ],
   "dependencies": {
     "tree-sitter": "^0.25.0",
