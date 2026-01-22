@@ -111,44 +111,140 @@ export const GROQ_FUNCTIONS: FunctionSignature[] = [
     description: 'Creates a path from a string for matching.',
     parameters: ['string'],
   },
+];
+
+export const GROQ_NAMESPACED_FUNCTIONS: FunctionSignature[] = [
+  // geo:: namespace
   {
-    name: 'global',
-    signature: 'global::...',
-    description: 'Access to global namespace functions.',
+    name: 'geo::contains',
+    signature: 'geo::contains(geo1, geo2) -> boolean',
+    description: 'Returns true if the second argument is fully contained within the first.',
+    parameters: ['geo1', 'geo2'],
   },
   {
-    name: 'pt',
+    name: 'geo::distance',
+    signature: 'geo::distance(point1, point2) -> number',
+    description: 'Calculates the distance in meters between two geographic points.',
+    parameters: ['point1', 'point2'],
+  },
+  {
+    name: 'geo::intersects',
+    signature: 'geo::intersects(geo1, geo2) -> boolean',
+    description: 'Returns true if the two geographic shapes intersect.',
+    parameters: ['geo1', 'geo2'],
+  },
+  {
+    name: 'geo::latLng',
+    signature: 'geo::latLng(lat, lng) -> geopoint',
+    description: 'Creates a geopoint from latitude and longitude values.',
+    parameters: ['lat', 'lng'],
+  },
+  // pt:: namespace (Portable Text)
+  {
+    name: 'pt::text',
     signature: 'pt::text(blocks) -> string',
     description: 'Extracts plain text from Portable Text blocks.',
+    parameters: ['blocks'],
+  },
+  // math:: namespace
+  {
+    name: 'math::avg',
+    signature: 'math::avg(array) -> number',
+    description: 'Calculates the average of numeric values in an array.',
+    parameters: ['array'],
   },
   {
-    name: 'geo',
-    signature: 'geo::distance(point1, point2) -> number',
-    description: 'Calculates geographical distance between two points.',
+    name: 'math::max',
+    signature: 'math::max(array) -> number',
+    description: 'Returns the maximum value from an array of numbers.',
+    parameters: ['array'],
   },
   {
-    name: 'math',
+    name: 'math::min',
+    signature: 'math::min(array) -> number',
+    description: 'Returns the minimum value from an array of numbers.',
+    parameters: ['array'],
+  },
+  {
+    name: 'math::sum',
     signature: 'math::sum(array) -> number',
-    description: 'Mathematical functions namespace.',
+    description: 'Calculates the sum of numeric values in an array.',
+    parameters: ['array'],
+  },
+  // array:: namespace
+  {
+    name: 'array::compact',
+    signature: 'array::compact(array) -> array',
+    description: 'Removes null values from an array.',
+    parameters: ['array'],
   },
   {
-    name: 'array',
+    name: 'array::intersects',
+    signature: 'array::intersects(array1, array2) -> boolean',
+    description: 'Returns true if the two arrays have any common elements.',
+    parameters: ['array1', 'array2'],
+  },
+  {
+    name: 'array::join',
+    signature: 'array::join(array, separator) -> string',
+    description: 'Joins array elements into a string with the given separator.',
+    parameters: ['array', 'separator'],
+  },
+  {
+    name: 'array::unique',
     signature: 'array::unique(array) -> array',
-    description: 'Array manipulation functions namespace.',
+    description: 'Returns an array with duplicate values removed.',
+    parameters: ['array'],
+  },
+  // string:: namespace
+  {
+    name: 'string::split',
+    signature: 'string::split(str, separator) -> array',
+    description: 'Splits a string into an array using the given separator.',
+    parameters: ['str', 'separator'],
   },
   {
-    name: 'string',
-    signature: 'string::split(str, sep) -> array',
-    description: 'String manipulation functions namespace.',
+    name: 'string::startsWith',
+    signature: 'string::startsWith(str, prefix) -> boolean',
+    description: 'Returns true if the string starts with the given prefix.',
+    parameters: ['str', 'prefix'],
+  },
+  // global:: namespace
+  {
+    name: 'global::references',
+    signature: 'global::references(id) -> boolean',
+    description: 'Checks if any document in the dataset references the given ID.',
+    parameters: ['id'],
+  },
+  // sanity:: namespace
+  {
+    name: 'sanity::dataset',
+    signature: 'sanity::dataset() -> string',
+    description: 'Returns the name of the current dataset.',
+    parameters: [],
   },
   {
-    name: 'sanity',
-    signature: 'sanity::...',
-    description: 'Sanity-specific functions namespace.',
+    name: 'sanity::projectId',
+    signature: 'sanity::projectId() -> string',
+    description: 'Returns the ID of the current Sanity project.',
+    parameters: [],
+  },
+  {
+    name: 'sanity::partOfRelease',
+    signature: 'sanity::partOfRelease(releaseId) -> boolean',
+    description: 'Returns true if the document is part of the specified release.',
+    parameters: ['releaseId'],
+  },
+  {
+    name: 'sanity::versionOf',
+    signature: 'sanity::versionOf(documentId) -> boolean',
+    description: 'Returns true if the document is a version of the specified document.',
+    parameters: ['documentId'],
   },
 ];
 
 export const GROQ_KEYWORDS = [
+  { label: 'fn', description: 'Define a custom function' },
   { label: 'in', description: 'Check if value is in an array or range' },
   { label: 'match', description: 'Pattern matching for text search' },
   { label: 'asc', description: 'Sort in ascending order' },
@@ -188,7 +284,7 @@ export const SPECIAL_CHARS = [
 ];
 
 export function getFunctionCompletions(): CompletionItem[] {
-  return GROQ_FUNCTIONS.map((fn, index) => ({
+  const basicFunctions = GROQ_FUNCTIONS.map((fn, index) => ({
     label: fn.name,
     kind: CompletionItemKind.Function,
     detail: fn.signature,
@@ -199,6 +295,20 @@ export function getFunctionCompletions(): CompletionItem[] {
     insertTextFormat: 2,
     sortText: `3-${String(index).padStart(4, '0')}-${fn.name}`,
   }));
+
+  const namespacedFunctions = GROQ_NAMESPACED_FUNCTIONS.map((fn, index) => ({
+    label: fn.name,
+    kind: CompletionItemKind.Function,
+    detail: fn.signature,
+    documentation: fn.description,
+    insertText: fn.parameters?.length
+      ? `${fn.name}($1)`
+      : `${fn.name}()`,
+    insertTextFormat: 2,
+    sortText: `3-${String(index + GROQ_FUNCTIONS.length).padStart(4, '0')}-${fn.name}`,
+  }));
+
+  return [...basicFunctions, ...namespacedFunctions];
 }
 
 export function getKeywordCompletions(): CompletionItem[] {

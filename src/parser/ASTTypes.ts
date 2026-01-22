@@ -43,6 +43,9 @@ export type GroqNodeType =
   | 'object'
   | 'object_pair'
   | 'function_call'
+  | 'function_definition'
+  | 'parameter_list'
+  | 'namespaced_identifier'
   | 'comment'
   | 'ERROR';
 

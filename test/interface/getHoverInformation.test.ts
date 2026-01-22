@@ -60,4 +60,36 @@ describe('getHoverInformation', () => {
     const hover = getHoverInformation(query, result.tree.rootNode, { line: 0, character: 100 });
     expect(hover).toBeNull();
   });
+
+  it('returns hover for namespaced function calls', () => {
+    const query = 'geo::distance(point1, point2)';
+    const result = parser.parse(query);
+    const hover = getHoverInformation(query, result.tree.rootNode, { line: 0, character: 5 });
+    expect(hover).not.toBeNull();
+    expect((hover?.contents as { value: string }).value).toContain('geo::distance');
+  });
+
+  it('returns hover for pt::text function', () => {
+    const query = 'pt::text(body)';
+    const result = parser.parse(query);
+    const hover = getHoverInformation(query, result.tree.rootNode, { line: 0, character: 3 });
+    expect(hover).not.toBeNull();
+    expect((hover?.contents as { value: string }).value).toContain('pt::text');
+  });
+
+  it('returns hover for function definitions', () => {
+    const query = 'fn double($x) = $x * 2';
+    const result = parser.parse(query);
+    const hover = getHoverInformation(query, result.tree.rootNode, { line: 0, character: 3 });
+    expect(hover).not.toBeNull();
+    expect((hover?.contents as { value: string }).value).toContain('Function Definition');
+  });
+
+  it('returns hover for namespaced function definitions', () => {
+    const query = 'fn myApp::getData($id) = *[_id == $id]';
+    const result = parser.parse(query);
+    const hover = getHoverInformation(query, result.tree.rootNode, { line: 0, character: 10 });
+    expect(hover).not.toBeNull();
+    expect((hover?.contents as { value: string }).value).toContain('myApp::getData');
+  });
 });

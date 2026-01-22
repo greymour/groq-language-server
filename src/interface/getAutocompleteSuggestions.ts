@@ -11,6 +11,7 @@ import {
   getPipeCompletions,
   getAfterEverythingCompletions,
   GROQ_FUNCTIONS,
+  GROQ_NAMESPACED_FUNCTIONS,
 } from './completionData.js';
 import { CompletionItemKind } from 'vscode-languageserver';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
@@ -154,6 +155,7 @@ function getCompletionsForContext(
       return [
         ...getSpecialCharCompletions(),
         ...getFunctionCompletions(),
+        ...getKeywordCompletions(),
       ];
 
     case 'afterEverything':
@@ -251,7 +253,10 @@ function collectVariables(node: SyntaxNode, variables: Set<string>): void {
 
 export function getFunctionSignature(name: string): string | null {
   const fn = GROQ_FUNCTIONS.find((f) => f.name === name);
-  return fn?.signature ?? null;
+  if (fn) return fn.signature;
+
+  const namespacedFn = GROQ_NAMESPACED_FUNCTIONS.find((f) => f.name === name);
+  return namespacedFn?.signature ?? null;
 }
 
 function getSchemaTypeCompletions(

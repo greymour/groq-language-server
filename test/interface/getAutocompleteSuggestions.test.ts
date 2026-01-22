@@ -54,4 +54,19 @@ describe('getAutocompleteSuggestions', () => {
     expect(completions.some(c => c.label === 'in')).toBe(true);
     expect(completions.some(c => c.label === 'match')).toBe(true);
   });
+
+  it('returns namespaced functions', () => {
+    const result = parser.parse('');
+    const completions = getAutocompleteSuggestions('', result.tree.rootNode, { line: 0, character: 0 });
+    expect(completions.some(c => c.label === 'geo::distance')).toBe(true);
+    expect(completions.some(c => c.label === 'pt::text')).toBe(true);
+    expect(completions.some(c => c.label === 'math::sum')).toBe(true);
+    expect(completions.some(c => c.label === 'array::unique')).toBe(true);
+  });
+
+  it('returns fn keyword', () => {
+    const result = parser.parse('');
+    const completions = getAutocompleteSuggestions('', result.tree.rootNode, { line: 0, character: 0 });
+    expect(completions.some(c => c.label === 'fn')).toBe(true);
+  });
 });

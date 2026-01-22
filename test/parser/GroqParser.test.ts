@@ -69,5 +69,60 @@ describe('GroqParser', () => {
       const result = parser.parse(query);
       expect(result.hasErrors).toBe(false);
     });
+
+    it('parses namespaced function calls', () => {
+      const result = parser.parse('geo::distance(point1, point2)');
+      expect(result.hasErrors).toBe(false);
+      const rootChild = result.tree.rootNode.namedChild(0);
+      expect(rootChild?.type).toBe('function_call');
+      const nameNode = rootChild?.childForFieldName('name');
+      expect(nameNode?.type).toBe('namespaced_identifier');
+      expect(nameNode?.text).toBe('geo::distance');
+    });
+
+    it('parses pt::text function call', () => {
+      const result = parser.parse('pt::text(body)');
+      expect(result.hasErrors).toBe(false);
+      const rootChild = result.tree.rootNode.namedChild(0);
+      expect(rootChild?.type).toBe('function_call');
+    });
+
+    it('parses simple function definition', () => {
+      const result = parser.parse('fn double($x) = $x * 2');
+      expect(result.hasErrors).toBe(false);
+      const rootChild = result.tree.rootNode.namedChild(0);
+      expect(rootChild?.type).toBe('function_definition');
+      const nameNode = rootChild?.childForFieldName('name');
+      expect(nameNode?.text).toBe('double');
+    });
+
+    it('parses namespaced function definition', () => {
+      const result = parser.parse('fn myApp::getPosts($type) = *[_type == $type]');
+      expect(result.hasErrors).toBe(false);
+      const rootChild = result.tree.rootNode.namedChild(0);
+      expect(rootChild?.type).toBe('function_definition');
+      const nameNode = rootChild?.childForFieldName('name');
+      expect(nameNode?.type).toBe('namespaced_identifier');
+      expect(nameNode?.text).toBe('myApp::getPosts');
+    });
+
+    it('parses function definition with semicolon', () => {
+      const result = parser.parse('fn utils::add($a, $b) = $a + $b;');
+      expect(result.hasErrors).toBe(false);
+    });
+
+    it('parses multiple function definitions followed by expression', () => {
+      const query = `
+        fn utils::double($x) = $x * 2;
+        fn utils::add($a, $b) = $a + $b;
+        utils::add(1, utils::double(2))
+      `;
+      const result = parser.parse(query);
+      expect(result.hasErrors).toBe(false);
+      expect(result.tree.rootNode.namedChildCount).toBe(3);
+      expect(result.tree.rootNode.namedChild(0)?.type).toBe('function_definition');
+      expect(result.tree.rootNode.namedChild(1)?.type).toBe('function_definition');
+      expect(result.tree.rootNode.namedChild(2)?.type).toBe('function_call');
+    });
   });
 });

@@ -4,7 +4,7 @@ import type { SyntaxNode } from '../parser/ASTTypes.js';
 import { nodeToRange } from '../parser/ASTTypes.js';
 import { getNamedNodeAtPosition } from '../parser/nodeUtils.js';
 import { toLSPRange } from '../utils/Range.js';
-import { GROQ_FUNCTIONS, GROQ_KEYWORDS } from './completionData.js';
+import { GROQ_FUNCTIONS, GROQ_NAMESPACED_FUNCTIONS, GROQ_KEYWORDS } from './completionData.js';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
 import { inferTypeContext } from '../schema/TypeInference.js';
 
@@ -38,11 +38,69 @@ function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader): Markup
       return null;
     }
 
+    case 'function_definition': {
+      const nameNode = node.childForFieldName('name');
+      const paramList = node.children.find(c => c.type === 'parameter_list');
+      const bodyNode = node.childForFieldName('body');
+
+      const funcName = nameNode?.text ?? 'unknown';
+      const params = paramList?.children
+        .filter(c => c.type === 'variable')
+        .map(c => c.text)
+        .join(', ') ?? '';
+      const bodyPreview = bodyNode?.text?.slice(0, 50) ?? '';
+
+      return createMarkdown(
+        `**Function Definition**\n\n\`\`\`groq\nfn ${funcName}(${params}) = ${bodyPreview}${bodyPreview.length >= 50 ? '...' : ''}\n\`\`\`\n\nA custom GROQ function definition.`
+      );
+    }
+
+    case 'namespaced_identifier': {
+      const fullName = node.text;
+      if (node.parent?.type === 'function_call') {
+        return getFunctionHover(fullName);
+      }
+      if (node.parent?.type === 'function_definition') {
+        return createMarkdown(
+          `**\`${fullName}\`** - Custom function name\n\nNamespaced identifier for a user-defined function.`
+        );
+      }
+      return createMarkdown(`**\`${fullName}\`** - Namespaced identifier`);
+    }
+
     case 'identifier': {
       if (node.parent?.type === 'function_call') {
         const nameField = node.parent.childForFieldName('name');
         if (nameField === node) {
           return getFunctionHover(node.text);
+        }
+      }
+      if (node.parent?.type === 'namespaced_identifier') {
+        const grandparent = node.parent.parent;
+        if (grandparent?.type === 'function_call') {
+          return getFunctionHover(node.parent.text);
+        }
+        if (grandparent?.type === 'function_definition') {
+          return createMarkdown(
+            `**\`${node.parent.text}\`** - Custom function name\n\nNamespaced identifier for a user-defined function.`
+          );
+        }
+        return null;
+      }
+      if (node.parent?.type === 'function_definition') {
+        const nameField = node.parent.childForFieldName('name');
+        if (nameField === node) {
+          const funcDef = node.parent;
+          const paramList = funcDef.children.find(c => c.type === 'parameter_list');
+          const bodyNode = funcDef.childForFieldName('body');
+          const params = paramList?.children
+            .filter(c => c.type === 'variable')
+            .map(c => c.text)
+            .join(', ') ?? '';
+          const bodyPreview = bodyNode?.text?.slice(0, 50) ?? '';
+          return createMarkdown(
+            `**Function Definition**\n\n\`\`\`groq\nfn ${node.text}(${params}) = ${bodyPreview}${bodyPreview.length >= 50 ? '...' : ''}\n\`\`\`\n\nA custom GROQ function definition.`
+          );
         }
       }
       return getIdentifierHover(node, schemaLoader);
@@ -158,7 +216,8 @@ function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader): Markup
 }
 
 function getFunctionHover(name: string): MarkupContent | null {
-  const fn = GROQ_FUNCTIONS.find((f) => f.name === name);
+  const fn = GROQ_FUNCTIONS.find((f) => f.name === name)
+    ?? GROQ_NAMESPACED_FUNCTIONS.find((f) => f.name === name);
   if (!fn) return null;
 
   let markdown = `**${fn.name}**\n\n\`\`\`groq\n${fn.signature}\n\`\`\`\n\n${fn.description}`;
