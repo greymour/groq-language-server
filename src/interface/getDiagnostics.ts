@@ -3,9 +3,34 @@ import { DiagnosticSeverity } from 'vscode-languageserver';
 import type { ParseResult, SyntaxNode } from '../parser/ASTTypes.js';
 import { nodeToRange } from '../parser/ASTTypes.js';
 import { toLSPRange } from '../utils/Range.js';
-import { walkTree, findAncestorOfType } from '../parser/nodeUtils.js';
+import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils.js';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
 import { inferTypeContext, getAvailableFields } from '../schema/TypeInference.js';
+
+const PRIMITIVE_TYPES = new Set([
+  'string',
+  'number',
+  'boolean',
+  'text',
+  'datetime',
+  'date',
+  'url',
+  'slug',
+  'geopoint',
+]);
+
+const BUILT_IN_FIELD_TYPES: Record<string, string> = {
+  '_id': 'string',
+  '_type': 'string',
+  '_rev': 'string',
+  '_createdAt': 'datetime',
+  '_updatedAt': 'datetime',
+  '_key': 'string',
+};
+
+function getBuiltInFieldType(fieldName: string): string | undefined {
+  return BUILT_IN_FIELD_TYPES[fieldName];
+}
 
 export interface DiagnosticsOptions {
   schemaLoader?: SchemaLoader;
@@ -33,6 +58,12 @@ export function getDiagnostics(
       options.schemaLoader
     );
     diagnostics.push(...schemaErrors);
+
+    const primitiveProjectionErrors = validatePrimitiveProjections(
+      parseResult.tree.rootNode,
+      options.schemaLoader
+    );
+    diagnostics.push(...primitiveProjectionErrors);
   }
 
   return diagnostics;
@@ -86,6 +117,65 @@ function validateFieldReferences(
         severity: DiagnosticSeverity.Warning,
         range: toLSPRange(nodeToRange(node)),
         message: `Field "${fieldName}" does not exist on type "${context.type.name}"`,
+        source: 'groq',
+      });
+    }
+  });
+
+  return diagnostics;
+}
+
+function validatePrimitiveProjections(
+  root: SyntaxNode,
+  schemaLoader: SchemaLoader
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const checkedNodes = new Set<number>();
+
+  walkTree(root, (node) => {
+    if (node.type !== 'projection_expression') return;
+    if (checkedNodes.has(node.id)) return;
+    checkedNodes.add(node.id);
+
+    // Get the base of the projection_expression
+    const baseNode = getFieldNode(node, 'base');
+    if (!baseNode || baseNode.type !== 'identifier') return;
+
+    const fieldName = baseNode.text;
+
+    // Check built-in fields directly - they're all primitives
+    if (fieldName.startsWith('_')) {
+      const builtInType = getBuiltInFieldType(fieldName);
+      if (builtInType && PRIMITIVE_TYPES.has(builtInType)) {
+        const projectionNode = getFieldNode(node, 'projection');
+        diagnostics.push({
+          severity: DiagnosticSeverity.Error,
+          range: toLSPRange(nodeToRange(projectionNode ?? node)),
+          message: `Cannot project on primitive type "${builtInType}" (field "${fieldName}")`,
+          source: 'groq',
+        });
+      }
+      return;
+    }
+
+    // Find the parent type context to look up this field
+    const parentProjection = findAncestorOfType(node, ['projection']);
+    if (!parentProjection) return;
+
+    const context = inferTypeContext(parentProjection, schemaLoader);
+    if (!context.type) return;
+
+    // Look up the field in the parent type
+    const field = schemaLoader.getField(context.type.name, fieldName);
+    if (!field) return;
+
+    // Check if the field type is primitive
+    if (PRIMITIVE_TYPES.has(field.type)) {
+      const projectionNode = getFieldNode(node, 'projection');
+      diagnostics.push({
+        severity: DiagnosticSeverity.Error,
+        range: toLSPRange(nodeToRange(projectionNode ?? node)),
+        message: `Cannot project on primitive type "${field.type}" (field "${fieldName}")`,
         source: 'groq',
       });
     }
