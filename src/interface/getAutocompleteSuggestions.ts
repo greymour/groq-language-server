@@ -13,10 +13,11 @@ import {
   GROQ_FUNCTIONS,
   GROQ_NAMESPACED_FUNCTIONS,
 } from './completionData.js';
-import { CompletionItemKind } from 'vscode-languageserver';
+import { CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext, inferTypeContextFromText, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
+import { inferTypeContext, inferTypeContextFromText, inferTypeContextInFunctionBody, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
 import type { ResolvedField } from '../schema/SchemaTypes.js';
+import { FunctionRegistry } from '../schema/FunctionRegistry.js';
 
 type CompletionContext =
   | 'empty'
@@ -37,7 +38,9 @@ export function getAutocompleteSuggestions(
   schemaLoader?: SchemaLoader
 ): CompletionItem[] {
   const context = determineCompletionContext(source, root, position);
-  return getCompletionsForContext(context, source, root, position, schemaLoader);
+  const functionRegistry = new FunctionRegistry();
+  functionRegistry.extractFromAST(root, schemaLoader);
+  return getCompletionsForContext(context, source, root, position, schemaLoader, functionRegistry);
 }
 
 function determineCompletionContext(
@@ -145,16 +148,22 @@ function getCompletionsForContext(
   source: string,
   root: SyntaxNode,
   position: Position,
-  schemaLoader?: SchemaLoader
+  schemaLoader?: SchemaLoader,
+  functionRegistry?: FunctionRegistry
 ): CompletionItem[] {
   const word = getWordAtPosition(source, position);
   const node = getNodeAtPosition(root, position);
+
+  const customFunctionCompletions = functionRegistry
+    ? getCustomFunctionCompletions(functionRegistry)
+    : [];
 
   switch (context) {
     case 'empty':
       return [
         ...getSpecialCharCompletions(),
         ...getFunctionCompletions(),
+        ...customFunctionCompletions,
         ...getKeywordCompletions(),
       ];
 
@@ -165,22 +174,24 @@ function getCompletionsForContext(
       return [
         ...getFilterStartCompletions(),
         ...getSchemaTypeCompletions(source, position, schemaLoader),
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getKeywordCompletions(),
         ...getFunctionCompletions(),
+        ...customFunctionCompletions,
         ...getVariableCompletions(root),
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
 
     case 'insideProjection':
       return [
         ...getProjectionCompletions(),
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getFunctionCompletions(),
+        ...customFunctionCompletions,
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
 
     case 'afterDot':
       return [
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getFieldCompletions(),
         ...getSpecialCharCompletions().filter((c) => c.label === '@' || c.label === '^'),
       ];
@@ -202,7 +213,7 @@ function getCompletionsForContext(
 
     case 'functionArgs':
       return [
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getFieldCompletions(),
         ...getVariableCompletions(root),
       ];
@@ -213,6 +224,7 @@ function getCompletionsForContext(
         ...getSpecialCharCompletions(),
         ...getKeywordCompletions(),
         ...getFunctionCompletions(),
+        ...customFunctionCompletions,
         ...getVariableCompletions(root),
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
   }
@@ -282,12 +294,24 @@ function getSchemaFieldCompletions(
   source: string,
   position: Position,
   node: SyntaxNode | null,
-  schemaLoader?: SchemaLoader
+  schemaLoader?: SchemaLoader,
+  functionRegistry?: FunctionRegistry
 ): CompletionItem[] {
   if (!schemaLoader?.isLoaded()) return [];
 
-  // Try AST-based inference first
-  let context = node ? inferTypeContext(node, schemaLoader) : null;
+  // Check if we're inside a function body - use function-aware inference
+  let context = null;
+  if (node && functionRegistry) {
+    const funcDef = functionRegistry.isInsideFunctionBody(node);
+    if (funcDef) {
+      context = inferTypeContextInFunctionBody(node, funcDef, functionRegistry, schemaLoader);
+    }
+  }
+
+  // Try AST-based inference if not in function body or no context found
+  if (!context?.type && node) {
+    context = inferTypeContext(node, schemaLoader);
+  }
 
   // If AST-based inference didn't find a specific type, try text-based inference
   if (!context?.type) {
@@ -298,6 +322,31 @@ function getSchemaFieldCompletions(
 
   const fields = getAvailableFields(context, schemaLoader);
   return fields.map((field, index) => resolvedFieldToCompletion(field, index));
+}
+
+function getCustomFunctionCompletions(functionRegistry: FunctionRegistry): CompletionItem[] {
+  const definitions = functionRegistry.getAllDefinitions();
+  return definitions.map((def, index) => {
+    const inferredTypes = def.parameters.map(p => {
+      const types = Array.from(p.inferredTypes);
+      return types.length > 0 ? types.join(' | ') : 'unknown';
+    });
+    const paramSignature = def.parameters.map((p, i) =>
+      `${p.name}: ${inferredTypes[i]}`
+    ).join(', ');
+
+    return {
+      label: def.name,
+      kind: CompletionItemKind.Function,
+      detail: `fn ${def.name}(${paramSignature})`,
+      documentation: `Custom function defined in this document`,
+      insertText: def.parameters.length > 0
+        ? `${def.name}($1)`
+        : `${def.name}()`,
+      insertTextFormat: InsertTextFormat.Snippet,
+      sortText: `2-${String(index).padStart(4, '0')}-${def.name}`,
+    };
+  });
 }
 
 function getReferenceFieldCompletions(

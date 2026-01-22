@@ -82,7 +82,8 @@ describe('getHoverInformation', () => {
     const result = parser.parse(query);
     const hover = getHoverInformation(query, result.tree.rootNode, { line: 0, character: 3 });
     expect(hover).not.toBeNull();
-    expect((hover?.contents as { value: string }).value).toContain('Function Definition');
+    expect((hover?.contents as { value: string }).value).toContain('double');
+    expect((hover?.contents as { value: string }).value).toContain('Custom function');
   });
 
   it('returns hover for namespaced function definitions', () => {

@@ -3,6 +3,7 @@ import type { SyntaxNode } from '../parser/ASTTypes.js';
 import { nodeToRange } from '../parser/ASTTypes.js';
 import { getNamedNodeAtPosition, walkTree } from '../parser/nodeUtils.js';
 import { toLSPRange } from '../utils/Range.js';
+import { FunctionRegistry } from '../schema/FunctionRegistry.js';
 
 export function getDefinition(
   _source: string,
@@ -12,6 +13,9 @@ export function getDefinition(
 ): Location | null {
   const node = getNamedNodeAtPosition(root, position);
   if (!node) return null;
+
+  const functionRegistry = new FunctionRegistry();
+  functionRegistry.extractFromAST(root);
 
   if (node.type === 'variable') {
     const variableName = node.text;
@@ -28,7 +32,46 @@ export function getDefinition(
     };
   }
 
+  if (node.type === 'namespaced_identifier') {
+    if (node.parent?.type === 'function_call') {
+      const funcDef = functionRegistry.getDefinition(node.text);
+      if (funcDef) {
+        return {
+          uri,
+          range: toLSPRange(nodeToRange(funcDef.nameNode)),
+        };
+      }
+    }
+  }
+
   if (node.type === 'identifier') {
+    // Check if this is a function call
+    if (node.parent?.type === 'function_call') {
+      const nameNode = node.parent.childForFieldName('name');
+      if (nameNode === node) {
+        const funcDef = functionRegistry.getDefinition(node.text);
+        if (funcDef) {
+          return {
+            uri,
+            range: toLSPRange(nodeToRange(funcDef.nameNode)),
+          };
+        }
+      }
+    }
+
+    // Check if this is part of a namespaced function call
+    if (node.parent?.type === 'namespaced_identifier') {
+      if (node.parent.parent?.type === 'function_call') {
+        const funcDef = functionRegistry.getDefinition(node.parent.text);
+        if (funcDef) {
+          return {
+            uri,
+            range: toLSPRange(nodeToRange(funcDef.nameNode)),
+          };
+        }
+      }
+    }
+
     if (node.parent?.type === 'access_expression' || node.parent?.type === 'dereference_expression') {
       const memberField = node.parent.childForFieldName('member');
       if (memberField === node) {

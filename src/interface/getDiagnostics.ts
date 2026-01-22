@@ -5,7 +5,8 @@ import { nodeToRange } from '../parser/ASTTypes.js';
 import { toLSPRange } from '../utils/Range.js';
 import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils.js';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext, getAvailableFields } from '../schema/TypeInference.js';
+import { inferTypeContext, inferTypeContextInFunctionBody, getAvailableFields } from '../schema/TypeInference.js';
+import { FunctionRegistry } from '../schema/FunctionRegistry.js';
 
 const PRIMITIVE_TYPES = new Set([
   'string',
@@ -53,15 +54,20 @@ export function getDiagnostics(
   }
 
   if (options.schemaLoader?.isLoaded() && options.source) {
+    const functionRegistry = new FunctionRegistry();
+    functionRegistry.extractFromAST(parseResult.tree.rootNode, options.schemaLoader);
+
     const schemaErrors = validateFieldReferences(
       parseResult.tree.rootNode,
-      options.schemaLoader
+      options.schemaLoader,
+      functionRegistry
     );
     diagnostics.push(...schemaErrors);
 
     const primitiveProjectionErrors = validatePrimitiveProjections(
       parseResult.tree.rootNode,
-      options.schemaLoader
+      options.schemaLoader,
+      functionRegistry
     );
     diagnostics.push(...primitiveProjectionErrors);
   }
@@ -71,7 +77,8 @@ export function getDiagnostics(
 
 function validateFieldReferences(
   root: SyntaxNode,
-  schemaLoader: SchemaLoader
+  schemaLoader: SchemaLoader,
+  functionRegistry: FunctionRegistry
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const checkedNodes = new Set<number>();
@@ -93,18 +100,36 @@ function validateFieldReferences(
       if (keyNode?.id === node.id) return;
     }
 
-    // Skip function names
+    // Skip function names (both built-in and custom)
     if (parent?.type === 'function_call') {
       const funcNode = parent.childForFieldName('function');
       if (funcNode?.id === node.id) return;
+      const nameNode = parent.childForFieldName('name');
+      if (nameNode?.id === node.id) return;
     }
+
+    // Skip custom function definition names
+    if (parent?.type === 'function_definition') {
+      const nameNode = parent.childForFieldName('name');
+      if (nameNode?.id === node.id) return;
+    }
+
+    // Skip namespaced identifiers (custom function calls like brex::legalPageLinkTitles)
+    if (parent?.type === 'namespaced_identifier') return;
 
     // Only validate identifiers inside projections
     const projection = findAncestorOfType(node, ['projection']);
     if (!projection) return;
 
-    // Infer the type context for this node
-    const context = inferTypeContext(node, schemaLoader);
+    // Check if we're inside a function body - use function-aware inference
+    const funcDef = functionRegistry.isInsideFunctionBody(node);
+    let context;
+    if (funcDef) {
+      context = inferTypeContextInFunctionBody(node, funcDef, functionRegistry, schemaLoader);
+    } else {
+      context = inferTypeContext(node, schemaLoader);
+    }
+
     if (!context.type) return;
 
     // Get available fields for this type
@@ -127,7 +152,8 @@ function validateFieldReferences(
 
 function validatePrimitiveProjections(
   root: SyntaxNode,
-  schemaLoader: SchemaLoader
+  schemaLoader: SchemaLoader,
+  functionRegistry: FunctionRegistry
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const checkedNodes = new Set<number>();
@@ -162,7 +188,15 @@ function validatePrimitiveProjections(
     const parentProjection = findAncestorOfType(node, ['projection']);
     if (!parentProjection) return;
 
-    const context = inferTypeContext(parentProjection, schemaLoader);
+    // Check if we're inside a function body - use function-aware inference
+    const funcDef = functionRegistry.isInsideFunctionBody(node);
+    let context;
+    if (funcDef) {
+      context = inferTypeContextInFunctionBody(parentProjection, funcDef, functionRegistry, schemaLoader);
+    } else {
+      context = inferTypeContext(parentProjection, schemaLoader);
+    }
+
     if (!context.type) return;
 
     // Look up the field in the parent type

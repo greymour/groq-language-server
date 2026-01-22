@@ -1,4 +1,4 @@
-import { CompletionItemKind } from 'vscode-languageserver';
+import { CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import type { CompletionItem } from 'vscode-languageserver';
 
 export interface FunctionSignature {
@@ -292,7 +292,7 @@ export function getFunctionCompletions(): CompletionItem[] {
     insertText: fn.parameters?.length
       ? `${fn.name}($1)`
       : `${fn.name}()`,
-    insertTextFormat: 2,
+    insertTextFormat: InsertTextFormat.Snippet,
     sortText: `3-${String(index).padStart(4, '0')}-${fn.name}`,
   }));
 
@@ -304,7 +304,7 @@ export function getFunctionCompletions(): CompletionItem[] {
     insertText: fn.parameters?.length
       ? `${fn.name}($1)`
       : `${fn.name}()`,
-    insertTextFormat: 2,
+    insertTextFormat: InsertTextFormat.Snippet,
     sortText: `3-${String(index + GROQ_FUNCTIONS.length).padStart(4, '0')}-${fn.name}`,
   }));
 
@@ -344,28 +344,28 @@ export function getFilterStartCompletions(): CompletionItem[] {
       kind: CompletionItemKind.Snippet,
       detail: 'Filter by document type',
       insertText: '_type == "$1"',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: '_id ==',
       kind: CompletionItemKind.Snippet,
       detail: 'Filter by document ID',
       insertText: '_id == "$1"',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: 'defined()',
       kind: CompletionItemKind.Snippet,
       detail: 'Check if field is defined',
       insertText: 'defined($1)',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: 'references()',
       kind: CompletionItemKind.Snippet,
       detail: 'Check if document references another',
       insertText: 'references($1)',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
   ];
 }
@@ -420,7 +420,7 @@ export function getPipeCompletions(): CompletionItem[] {
       detail: 'order(field asc|desc)',
       documentation: 'Order the results by a field',
       insertText: 'order($1)',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: 'score()',
@@ -428,7 +428,7 @@ export function getPipeCompletions(): CompletionItem[] {
       detail: 'score(...terms)',
       documentation: 'Score results for relevance ranking',
       insertText: 'score($1)',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: '[0]',
@@ -442,7 +442,7 @@ export function getPipeCompletions(): CompletionItem[] {
       detail: 'Slice (exclusive end)',
       documentation: 'Get items 0-9',
       insertText: '[0..$1]',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: '[0...10]',
@@ -450,7 +450,7 @@ export function getPipeCompletions(): CompletionItem[] {
       detail: 'Slice (inclusive end)',
       documentation: 'Get items 0-10',
       insertText: '[0...$1]',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
   ];
 }
@@ -463,7 +463,7 @@ export function getAfterEverythingCompletions(): CompletionItem[] {
       detail: 'Filter documents',
       documentation: 'Add a filter to select specific documents',
       insertText: '[$1]',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: '{',
@@ -471,7 +471,7 @@ export function getAfterEverythingCompletions(): CompletionItem[] {
       detail: 'Project fields',
       documentation: 'Select which fields to return',
       insertText: '{\n  $1\n}',
-      insertTextFormat: 2,
+      insertTextFormat: InsertTextFormat.Snippet,
     },
     {
       label: '|',

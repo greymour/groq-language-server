@@ -2,6 +2,7 @@ import type { SyntaxNode } from '../parser/ASTTypes.js';
 import { getFieldNode, findAncestorOfType, walkTree } from '../parser/nodeUtils.js';
 import type { SchemaLoader } from './SchemaLoader.js';
 import type { ResolvedType, ResolvedField } from './SchemaTypes.js';
+import type { FunctionRegistry, FunctionDefinition } from './FunctionRegistry.js';
 
 export interface InferredContext {
   type: ResolvedType | null;
@@ -495,4 +496,129 @@ export function getReferenceTargetFields(
   }
 
   return Array.from(allFields.values());
+}
+
+export function inferTypeContextInFunctionBody(
+  node: SyntaxNode,
+  functionDef: FunctionDefinition,
+  functionRegistry: FunctionRegistry,
+  schemaLoader: SchemaLoader
+): InferredContext {
+  const context: InferredContext = {
+    type: null,
+    field: null,
+    isArray: false,
+    documentTypes: [],
+  };
+
+  const paramVariable = findParameterVariable(node, functionDef);
+  if (paramVariable) {
+    const inferredTypes = functionRegistry.getInferredParameterType(
+      functionDef.name,
+      paramVariable.index
+    );
+
+    if (inferredTypes.length > 0) {
+      const firstType = schemaLoader.getType(inferredTypes[0]);
+      if (firstType) {
+        context.type = firstType;
+        context.documentTypes = inferredTypes;
+        return finalizeContextInFunctionBody(context, node, schemaLoader);
+      }
+    }
+  }
+
+  const accessExpr = findAncestorOfType(node, ['access_expression', 'subscript_expression']);
+  if (accessExpr) {
+    const baseNode = getFieldNode(accessExpr, 'base');
+    if (baseNode?.type === 'variable') {
+      const paramMatch = findParameterByName(baseNode.text, functionDef);
+      if (paramMatch !== null) {
+        const inferredTypes = functionRegistry.getInferredParameterType(
+          functionDef.name,
+          paramMatch
+        );
+
+        if (inferredTypes.length > 0) {
+          const firstType = schemaLoader.getType(inferredTypes[0]);
+          if (firstType) {
+            context.type = firstType;
+            context.documentTypes = inferredTypes;
+            return finalizeContextInFunctionBody(context, node, schemaLoader);
+          }
+        }
+      }
+    }
+  }
+
+  return inferTypeContext(node, schemaLoader);
+}
+
+function findParameterVariable(
+  node: SyntaxNode,
+  functionDef: FunctionDefinition
+): { name: string; index: number } | null {
+  if (node.type === 'variable') {
+    const paramIndex = findParameterByName(node.text, functionDef);
+    if (paramIndex !== null) {
+      return { name: node.text, index: paramIndex };
+    }
+  }
+
+  let current: SyntaxNode | null = node;
+  while (current) {
+    if (current.type === 'variable') {
+      const paramIndex = findParameterByName(current.text, functionDef);
+      if (paramIndex !== null) {
+        return { name: current.text, index: paramIndex };
+      }
+    }
+
+    if (current.type === 'subscript_expression' || current.type === 'access_expression') {
+      const baseNode = getFieldNode(current, 'base');
+      if (baseNode?.type === 'variable') {
+        const paramIndex = findParameterByName(baseNode.text, functionDef);
+        if (paramIndex !== null) {
+          return { name: baseNode.text, index: paramIndex };
+        }
+      }
+    }
+
+    current = current.parent;
+  }
+
+  return null;
+}
+
+function findParameterByName(name: string, functionDef: FunctionDefinition): number | null {
+  for (let i = 0; i < functionDef.parameters.length; i++) {
+    if (functionDef.parameters[i].name === name) {
+      return i;
+    }
+  }
+  return null;
+}
+
+function finalizeContextInFunctionBody(
+  context: InferredContext,
+  node: SyntaxNode,
+  schemaLoader: SchemaLoader
+): InferredContext {
+  const accessExpr = findAncestorOfType(node, ['access_expression', 'dereference_expression']);
+  if (accessExpr && context.type) {
+    const memberNode = getFieldNode(accessExpr, 'member');
+    if (memberNode) {
+      context.field = schemaLoader.getField(context.type.name, memberNode.text) ?? null;
+    }
+  }
+
+  const subscriptExpr = findAncestorOfType(node, 'subscript_expression');
+  if (subscriptExpr) {
+    const baseNode = getFieldNode(subscriptExpr, 'base');
+    if (baseNode?.type === 'variable') {
+      context.isArray = true;
+    }
+  }
+
+  return context;
 }

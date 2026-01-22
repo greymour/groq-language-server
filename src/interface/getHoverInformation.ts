@@ -7,6 +7,7 @@ import { toLSPRange } from '../utils/Range.js';
 import { GROQ_FUNCTIONS, GROQ_NAMESPACED_FUNCTIONS, GROQ_KEYWORDS } from './completionData.js';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
 import { inferTypeContext } from '../schema/TypeInference.js';
+import { FunctionRegistry } from '../schema/FunctionRegistry.js';
 
 export function getHoverInformation(
   _source: string,
@@ -17,7 +18,10 @@ export function getHoverInformation(
   const node = getNamedNodeAtPosition(root, position);
   if (!node) return null;
 
-  const info = getNodeHoverInfo(node, schemaLoader);
+  const functionRegistry = new FunctionRegistry();
+  functionRegistry.extractFromAST(root, schemaLoader);
+
+  const info = getNodeHoverInfo(node, schemaLoader, functionRegistry);
   if (!info) return null;
 
   const range = nodeToRange(node);
@@ -28,11 +32,13 @@ export function getHoverInformation(
   };
 }
 
-function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader): MarkupContent | null {
+function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader, functionRegistry?: FunctionRegistry): MarkupContent | null {
   switch (node.type) {
     case 'function_call': {
       const nameNode = node.childForFieldName('name');
       if (nameNode) {
+        const customFuncHover = functionRegistry ? getCustomFunctionHover(nameNode.text, functionRegistry) : null;
+        if (customFuncHover) return customFuncHover;
         return getFunctionHover(nameNode.text);
       }
       return null;
@@ -58,9 +64,13 @@ function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader): Markup
     case 'namespaced_identifier': {
       const fullName = node.text;
       if (node.parent?.type === 'function_call') {
+        const customFuncHover = functionRegistry ? getCustomFunctionHover(fullName, functionRegistry) : null;
+        if (customFuncHover) return customFuncHover;
         return getFunctionHover(fullName);
       }
       if (node.parent?.type === 'function_definition') {
+        const customFuncHover = functionRegistry ? getCustomFunctionHover(fullName, functionRegistry) : null;
+        if (customFuncHover) return customFuncHover;
         return createMarkdown(
           `**\`${fullName}\`** - Custom function name\n\nNamespaced identifier for a user-defined function.`
         );
@@ -72,15 +82,21 @@ function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader): Markup
       if (node.parent?.type === 'function_call') {
         const nameField = node.parent.childForFieldName('name');
         if (nameField === node) {
+          const customFuncHover = functionRegistry ? getCustomFunctionHover(node.text, functionRegistry) : null;
+          if (customFuncHover) return customFuncHover;
           return getFunctionHover(node.text);
         }
       }
       if (node.parent?.type === 'namespaced_identifier') {
         const grandparent = node.parent.parent;
         if (grandparent?.type === 'function_call') {
+          const customFuncHover = functionRegistry ? getCustomFunctionHover(node.parent.text, functionRegistry) : null;
+          if (customFuncHover) return customFuncHover;
           return getFunctionHover(node.parent.text);
         }
         if (grandparent?.type === 'function_definition') {
+          const customFuncHover = functionRegistry ? getCustomFunctionHover(node.parent.text, functionRegistry) : null;
+          if (customFuncHover) return customFuncHover;
           return createMarkdown(
             `**\`${node.parent.text}\`** - Custom function name\n\nNamespaced identifier for a user-defined function.`
           );
@@ -90,6 +106,8 @@ function getNodeHoverInfo(node: SyntaxNode, schemaLoader?: SchemaLoader): Markup
       if (node.parent?.type === 'function_definition') {
         const nameField = node.parent.childForFieldName('name');
         if (nameField === node) {
+          const customFuncHover = functionRegistry ? getCustomFunctionHover(node.text, functionRegistry) : null;
+          if (customFuncHover) return customFuncHover;
           const funcDef = node.parent;
           const paramList = funcDef.children.find(c => c.type === 'parameter_list');
           const bodyNode = funcDef.childForFieldName('body');
@@ -224,6 +242,35 @@ function getFunctionHover(name: string): MarkupContent | null {
 
   if (fn.parameters && fn.parameters.length > 0) {
     markdown += `\n\n**Parameters:**\n${fn.parameters.map((p) => `- \`${p}\``).join('\n')}`;
+  }
+
+  return createMarkdown(markdown);
+}
+
+function getCustomFunctionHover(name: string, functionRegistry: FunctionRegistry): MarkupContent | null {
+  const funcDef = functionRegistry.getDefinition(name);
+  if (!funcDef) return null;
+
+  const paramSignatures = funcDef.parameters.map(p => {
+    const types = Array.from(p.inferredTypes);
+    const typeStr = types.length > 0 ? types.join(' | ') : 'unknown';
+    return `${p.name}: ${typeStr}`;
+  });
+
+  const bodyPreview = funcDef.bodyNode.text.slice(0, 80);
+  const bodyTruncated = bodyPreview.length >= 80 ? '...' : '';
+
+  let markdown = `**${funcDef.name}** - Custom function\n\n`;
+  markdown += `\`\`\`groq\nfn ${funcDef.name}(${paramSignatures.join(', ')}) = ${bodyPreview}${bodyTruncated}\n\`\`\`\n\n`;
+  markdown += `A custom GROQ function defined in this document.`;
+
+  if (funcDef.parameters.length > 0) {
+    markdown += `\n\n**Parameters (inferred types):**\n`;
+    markdown += funcDef.parameters.map(p => {
+      const types = Array.from(p.inferredTypes);
+      const typeStr = types.length > 0 ? types.join(' | ') : 'unknown';
+      return `- \`${p.name}\`: ${typeStr}`;
+    }).join('\n');
   }
 
   return createMarkdown(markdown);
