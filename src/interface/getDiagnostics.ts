@@ -61,6 +61,14 @@ export function getDiagnostics(
   const recursionErrors = validateNoRecursion(parseResult.tree.rootNode, functionRegistry);
   diagnostics.push(...recursionErrors);
 
+  // Validate type hint if provided
+  if (options.typeHint && options.schemaLoader?.isLoaded()) {
+    const typeHintError = validateTypeHint(options.typeHint, options.schemaLoader);
+    if (typeHintError) {
+      diagnostics.push(typeHintError);
+    }
+  }
+
   if (options.schemaLoader?.isLoaded() && options.source) {
     const schemaErrors = validateFieldReferences(
       parseResult.tree.rootNode,
@@ -291,4 +299,21 @@ function validateNoRecursion(
   });
 
   return diagnostics;
+}
+
+function validateTypeHint(
+  typeHint: string,
+  schemaLoader: SchemaLoader
+): Diagnostic | null {
+  const type = schemaLoader.getType(typeHint);
+  if (!type) {
+    const availableTypes = schemaLoader.getTypeNames();
+    return {
+      severity: DiagnosticSeverity.Warning,
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      message: `Type "${typeHint}" not found in schema. Available types: ${availableTypes.join(', ')}`,
+      source: 'groq',
+    };
+  }
+  return null;
 }
