@@ -53,10 +53,14 @@ export function getDiagnostics(
     });
   }
 
-  if (options.schemaLoader?.isLoaded() && options.source) {
-    const functionRegistry = new FunctionRegistry();
-    functionRegistry.extractFromAST(parseResult.tree.rootNode, options.schemaLoader);
+  // Always check for recursive function calls (doesn't require schema)
+  const functionRegistry = new FunctionRegistry();
+  functionRegistry.extractFromAST(parseResult.tree.rootNode, options.schemaLoader);
 
+  const recursionErrors = validateNoRecursion(parseResult.tree.rootNode, functionRegistry);
+  diagnostics.push(...recursionErrors);
+
+  if (options.schemaLoader?.isLoaded() && options.source) {
     const schemaErrors = validateFieldReferences(
       parseResult.tree.rootNode,
       options.schemaLoader,
@@ -210,6 +214,38 @@ function validatePrimitiveProjections(
         severity: DiagnosticSeverity.Error,
         range: toLSPRange(nodeToRange(projectionNode ?? node)),
         message: `Cannot project on primitive type "${field.type}" (field "${fieldName}")`,
+        source: 'groq',
+      });
+    }
+  });
+
+  return diagnostics;
+}
+
+function validateNoRecursion(
+  root: SyntaxNode,
+  functionRegistry: FunctionRegistry
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  walkTree(root, (node) => {
+    if (node.type !== 'function_call') return;
+
+    const nameNode = getFieldNode(node, 'name');
+    if (!nameNode) return;
+
+    const calledFuncName = nameNode.text;
+
+    // Check if this call is inside a function body
+    const containingFunc = functionRegistry.isInsideFunctionBody(node);
+    if (!containingFunc) return;
+
+    // Check if calling itself (direct recursion)
+    if (containingFunc.name === calledFuncName) {
+      diagnostics.push({
+        severity: DiagnosticSeverity.Error,
+        range: toLSPRange(nodeToRange(nameNode)),
+        message: `Recursive function calls are not supported in GROQ`,
         source: 'groq',
       });
     }

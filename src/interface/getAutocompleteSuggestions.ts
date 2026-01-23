@@ -1,7 +1,7 @@
 import type { CompletionItem, Position } from 'vscode-languageserver';
 import type { SyntaxNode } from '../parser/ASTTypes.js';
 import { getNodeAtPosition, findAncestorOfType, getFieldNode } from '../parser/nodeUtils.js';
-import { getCharacterBeforePosition, getWordAtPosition } from '../utils/positionUtils.js';
+import { getCharacterBeforePosition, getWordAtPosition, getNamespacePrefixAtPosition } from '../utils/positionUtils.js';
 import {
   getFunctionCompletions,
   getKeywordCompletions,
@@ -153,16 +153,34 @@ function getCompletionsForContext(
 ): CompletionItem[] {
   const word = getWordAtPosition(source, position);
   const node = getNodeAtPosition(root, position);
+  const namespacePrefix = getNamespacePrefixAtPosition(source, position);
+
+  // Check if we're inside a function body to exclude recursive suggestions
+  const currentFunctionDef = node && functionRegistry
+    ? functionRegistry.isInsideFunctionBody(node)
+    : null;
+  const excludeFunctionName = currentFunctionDef?.name ?? null;
 
   const customFunctionCompletions = functionRegistry
-    ? getCustomFunctionCompletions(functionRegistry)
+    ? getCustomFunctionCompletions(functionRegistry, namespacePrefix, excludeFunctionName)
     : [];
+
+  // Get function completions filtered by namespace
+  const funcCompletions = getFilteredFunctionCompletions(namespacePrefix);
+
+  // If we're completing a namespace, only show functions from that namespace
+  if (namespacePrefix) {
+    const allNamespacedFunctions = [...funcCompletions, ...customFunctionCompletions];
+    return allNamespacedFunctions.filter((item) =>
+      !word || item.label.toLowerCase().startsWith(word.toLowerCase())
+    );
+  }
 
   switch (context) {
     case 'empty':
       return [
         ...getSpecialCharCompletions(),
-        ...getFunctionCompletions(),
+        ...funcCompletions,
         ...customFunctionCompletions,
         ...getKeywordCompletions(),
       ];
@@ -176,7 +194,7 @@ function getCompletionsForContext(
         ...getSchemaTypeCompletions(source, position, schemaLoader),
         ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getKeywordCompletions(),
-        ...getFunctionCompletions(),
+        ...funcCompletions,
         ...customFunctionCompletions,
         ...getVariableCompletions(root),
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
@@ -185,7 +203,7 @@ function getCompletionsForContext(
       return [
         ...getProjectionCompletions(),
         ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
-        ...getFunctionCompletions(),
+        ...funcCompletions,
         ...customFunctionCompletions,
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
 
@@ -223,11 +241,37 @@ function getCompletionsForContext(
       return [
         ...getSpecialCharCompletions(),
         ...getKeywordCompletions(),
-        ...getFunctionCompletions(),
+        ...funcCompletions,
         ...customFunctionCompletions,
         ...getVariableCompletions(root),
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
   }
+}
+
+function getFilteredFunctionCompletions(namespacePrefix: string | null): CompletionItem[] {
+  if (!namespacePrefix) {
+    return getFunctionCompletions();
+  }
+
+  // Filter to only show functions in this namespace and transform the label
+  const namespace = `${namespacePrefix}::`;
+  const allFunctions = getFunctionCompletions();
+
+  return allFunctions
+    .filter(fn => fn.label.startsWith(namespace))
+    .map(fn => {
+      const funcName = fn.label.slice(namespace.length);
+      return {
+        ...fn,
+        // Show only the function name part (after namespace::)
+        label: funcName,
+        // Insert only the function name (namespace already typed)
+        insertText: fn.insertText?.replace(namespace, ''),
+        // Sort alphabetically by function name
+        sortText: `1-${funcName}`,
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function getFieldCompletions(): CompletionItem[] {
@@ -324,9 +368,22 @@ function getSchemaFieldCompletions(
   return fields.map((field, index) => resolvedFieldToCompletion(field, index));
 }
 
-function getCustomFunctionCompletions(functionRegistry: FunctionRegistry): CompletionItem[] {
+function getCustomFunctionCompletions(
+  functionRegistry: FunctionRegistry,
+  namespacePrefix: string | null,
+  excludeFunctionName: string | null = null
+): CompletionItem[] {
   const definitions = functionRegistry.getAllDefinitions();
-  return definitions.map((def, index) => {
+  const namespace = namespacePrefix ? `${namespacePrefix}::` : null;
+
+  // Filter definitions by namespace and exclude current function (no recursion in GROQ)
+  const filteredDefs = definitions.filter(def => {
+    if (excludeFunctionName && def.name === excludeFunctionName) return false;
+    if (namespace && !def.name.startsWith(namespace)) return false;
+    return true;
+  });
+
+  const completions = filteredDefs.map(def => {
     const inferredTypes = def.parameters.map(p => {
       const types = Array.from(p.inferredTypes);
       return types.length > 0 ? types.join(' | ') : 'unknown';
@@ -335,18 +392,27 @@ function getCustomFunctionCompletions(functionRegistry: FunctionRegistry): Compl
       `${p.name}: ${inferredTypes[i]}`
     ).join(', ');
 
+    // If filtering by namespace, show only the function name part
+    const displayName = namespace ? def.name.slice(namespace.length) : def.name;
+    const insertName = namespace ? displayName : def.name;
+
     return {
-      label: def.name,
+      label: displayName,
       kind: CompletionItemKind.Function,
       detail: `fn ${def.name}(${paramSignature})`,
       documentation: `Custom function defined in this document`,
       insertText: def.parameters.length > 0
-        ? `${def.name}($1)`
-        : `${def.name}()`,
+        ? `${insertName}($1)`
+        : `${insertName}()`,
       insertTextFormat: InsertTextFormat.Snippet,
-      sortText: `2-${String(index).padStart(4, '0')}-${def.name}`,
+      // Sort alphabetically by display name, with priority 2 for custom functions
+      sortText: `2-${displayName}`,
     };
   });
+
+  return namespace
+    ? completions.sort((a, b) => a.label.localeCompare(b.label))
+    : completions;
 }
 
 function getReferenceFieldCompletions(

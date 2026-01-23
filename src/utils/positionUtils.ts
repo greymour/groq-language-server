@@ -100,3 +100,15 @@ export function positionAfter(a: Position, b: Position): boolean {
 export function positionEquals(a: Position, b: Position): boolean {
   return a.line === b.line && a.character === b.character;
 }
+
+export function getNamespacePrefixAtPosition(text: string, position: Position): string | null {
+  const lineText = getLineText(text, position.line);
+  const before = lineText.slice(0, position.character);
+
+  // Match patterns like "brex::" or "geo::" at the end
+  const namespaceMatch = before.match(/([_A-Za-z][_0-9A-Za-z]*)::([_A-Za-z][_0-9A-Za-z]*)?$/);
+  if (namespaceMatch) {
+    return namespaceMatch[1];
+  }
+  return null;
+}

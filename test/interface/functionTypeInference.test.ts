@@ -191,6 +191,97 @@ myApp::helper(content)`;
     });
   });
 
+  describe('namespace filtering', () => {
+    it('filters completions to only show functions in typed namespace', () => {
+      const query = `fn brex::helper($x) = $x;
+fn other::func($y) = $y;
+brex::`;
+      const result = parser.parse(query);
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 2, character: 6 },
+        schemaLoader
+      );
+
+      // Should only show brex:: functions
+      expect(completions.some(c => c.label === 'helper')).toBe(true);
+      // Should not show other namespace or non-namespaced functions
+      expect(completions.some(c => c.label === 'other::func')).toBe(false);
+      expect(completions.some(c => c.label === 'func')).toBe(false);
+      expect(completions.some(c => c.label === 'count')).toBe(false);
+    });
+
+    it('filters built-in namespaced functions', () => {
+      const query = `geo::`;
+      const result = parser.parse(query);
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: 5 },
+        schemaLoader
+      );
+
+      // Should show geo:: functions
+      expect(completions.some(c => c.label === 'distance')).toBe(true);
+      expect(completions.some(c => c.label === 'contains')).toBe(true);
+      // Should not show functions from other namespaces
+      expect(completions.some(c => c.label === 'text')).toBe(false); // pt::text
+      expect(completions.some(c => c.label === 'avg')).toBe(false); // math::avg
+    });
+  });
+
+  describe('field completions in function bodies', () => {
+    it('provides schema field completions inside function body projection', () => {
+      const query = `fn getAuthor($ref) = $ref-> { };
+*[_type == "post"] { "a": getAuthor(author) }`;
+      const result = parser.parse(query);
+      // Position inside the projection braces
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: 29 },
+        schemaLoader
+      );
+
+      // Should have schema fields from the inferred type (author)
+      expect(completions.some(c => c.label === 'name')).toBe(true);
+      expect(completions.some(c => c.label === 'bio')).toBe(true);
+    });
+
+    it('provides schema field completions inside built-in function arguments', () => {
+      // Use a query with a placeholder to have a clear position inside the function
+      const query = `*[_type == "post"] { "c": count(t) }`;
+      const result = parser.parse(query);
+      // Position at the 't' inside count(t)
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: 32 },
+        schemaLoader
+      );
+
+      // Should have schema fields from post type (filtered by 't' prefix)
+      expect(completions.some(c => c.label === 'title')).toBe(true);
+    });
+
+    it('provides schema field completions inside defined() function', () => {
+      // Use a query with a partial field name to have a clear position inside the function
+      const query = `*[_type == "post" && defined(t)]`;
+      const result = parser.parse(query);
+      // Position at the 't' inside defined(t)
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: 29 },
+        schemaLoader
+      );
+
+      // Should have schema fields from post type (filtered by 't' prefix)
+      expect(completions.some(c => c.label === 'title')).toBe(true);
+    });
+  });
+
   describe('complex scenarios', () => {
     it('handles the example from the plan', () => {
       const query = `
@@ -231,6 +322,61 @@ fn utils::add($a, $b) = $a + $b;
         d.message.includes('add')
       );
       expect(utilsErrors).toHaveLength(0);
+    });
+  });
+
+  describe('recursion prevention', () => {
+    it('reports error for direct recursive function calls', () => {
+      const query = `fn recurse($x) = recurse($x)`;
+      const result = parser.parse(query);
+      const diagnostics = getDiagnostics(result, { schemaLoader, source: query });
+
+      const recursionErrors = diagnostics.filter(d =>
+        d.message.includes('Recursive')
+      );
+      expect(recursionErrors).toHaveLength(1);
+      expect(recursionErrors[0].message).toBe('Recursive function calls are not supported in GROQ');
+    });
+
+    it('reports error for namespaced recursive function calls', () => {
+      const query = `fn brex::legalPageContent($ref) = $ref[] { "titles": brex::legalPageContent(@) }`;
+      const result = parser.parse(query);
+      const diagnostics = getDiagnostics(result, { schemaLoader, source: query });
+
+      const recursionErrors = diagnostics.filter(d =>
+        d.message.includes('Recursive')
+      );
+      expect(recursionErrors).toHaveLength(1);
+    });
+
+    it('does not show recursive function in autocomplete when inside its body', () => {
+      const query = `fn brex::legalPageContent($ref) = $ref[] { t };`;
+      const result = parser.parse(query);
+      // Position at 't' inside the function body
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: 43 },
+        schemaLoader
+      );
+
+      // Should not suggest the function we're currently defining
+      expect(completions.some(c => c.label === 'brex::legalPageContent')).toBe(false);
+      expect(completions.some(c => c.label === 'legalPageContent')).toBe(false);
+    });
+
+    it('allows calling other functions from within a function body', () => {
+      const query = `
+fn helper($x) = $x * 2;
+fn main($y) = helper($y);
+      `;
+      const result = parser.parse(query);
+      const diagnostics = getDiagnostics(result, { schemaLoader, source: query });
+
+      const recursionErrors = diagnostics.filter(d =>
+        d.message.includes('Recursive')
+      );
+      expect(recursionErrors).toHaveLength(0);
     });
   });
 });

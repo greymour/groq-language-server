@@ -511,6 +511,12 @@ export function inferTypeContextInFunctionBody(
     documentTypes: [],
   };
 
+  // Try to find parameter context by tracing back through projections
+  const paramContext = findParameterContextInFunctionBody(node, functionDef, functionRegistry, schemaLoader);
+  if (paramContext) {
+    return paramContext;
+  }
+
   const paramVariable = findParameterVariable(node, functionDef);
   if (paramVariable) {
     const inferredTypes = functionRegistry.getInferredParameterType(
@@ -552,6 +558,100 @@ export function inferTypeContextInFunctionBody(
   }
 
   return inferTypeContext(node, schemaLoader);
+}
+
+function findParameterContextInFunctionBody(
+  node: SyntaxNode,
+  functionDef: FunctionDefinition,
+  functionRegistry: FunctionRegistry,
+  schemaLoader: SchemaLoader
+): InferredContext | null {
+  // Look for projection ancestor, then find the base expression
+  const projection = findAncestorOfType(node, ['projection']);
+  if (!projection || !projection.parent) return null;
+
+  const projExpr = projection.parent;
+  if (projExpr.type !== 'projection_expression') return null;
+
+  const baseNode = getFieldNode(projExpr, 'base');
+  if (!baseNode) return null;
+
+  // Handle $ref[] pattern - subscript on variable
+  if (baseNode.type === 'subscript_expression') {
+    const subscriptBase = getFieldNode(baseNode, 'base');
+    if (subscriptBase?.type === 'variable') {
+      const paramIndex = findParameterByName(subscriptBase.text, functionDef);
+      if (paramIndex !== null) {
+        const inferredTypes = functionRegistry.getInferredParameterType(
+          functionDef.name,
+          paramIndex
+        );
+
+        if (inferredTypes.length > 0) {
+          const firstType = schemaLoader.getType(inferredTypes[0]);
+          if (firstType) {
+            return {
+              type: firstType,
+              field: null,
+              isArray: true,
+              documentTypes: inferredTypes,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Handle $ref-> pattern - dereference on variable
+  if (baseNode.type === 'dereference_expression') {
+    const derefBase = getFieldNode(baseNode, 'base');
+    if (derefBase?.type === 'variable') {
+      const paramIndex = findParameterByName(derefBase.text, functionDef);
+      if (paramIndex !== null) {
+        const inferredTypes = functionRegistry.getInferredParameterType(
+          functionDef.name,
+          paramIndex
+        );
+
+        if (inferredTypes.length > 0) {
+          const firstType = schemaLoader.getType(inferredTypes[0]);
+          if (firstType) {
+            return {
+              type: firstType,
+              field: null,
+              isArray: false,
+              documentTypes: inferredTypes,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Handle direct $ref { } pattern
+  if (baseNode.type === 'variable') {
+    const paramIndex = findParameterByName(baseNode.text, functionDef);
+    if (paramIndex !== null) {
+      const inferredTypes = functionRegistry.getInferredParameterType(
+        functionDef.name,
+        paramIndex
+      );
+
+      if (inferredTypes.length > 0) {
+        const firstType = schemaLoader.getType(inferredTypes[0]);
+        if (firstType) {
+          return {
+            type: firstType,
+            field: null,
+            isArray: false,
+            documentTypes: inferredTypes,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 function findParameterVariable(
