@@ -176,6 +176,7 @@ export class GroqLanguageService {
       const diagnostics = getDiagnostics(query.parseResult, {
         schemaLoader: this.schemaLoader,
         source: query.content,
+        typeHint: query.typeHint,
       });
       for (const diag of diagnostics) {
         // Skip diagnostics that overlap with interpolation replacement positions
@@ -235,7 +236,13 @@ export class GroqLanguageService {
     if (!query) return [];
 
     const embeddedPosition = this.toEmbeddedPosition(query, position);
-    return getAutocompleteSuggestions(query.content, query.parseResult.tree.rootNode, embeddedPosition, this.schemaLoader);
+    return getAutocompleteSuggestions(
+      query.content,
+      query.parseResult.tree.rootNode,
+      embeddedPosition,
+      this.schemaLoader,
+      { typeHint: query.typeHint }
+    );
   }
 
   private getEmbeddedHover(document: TextDocument, position: Position): Hover | null {

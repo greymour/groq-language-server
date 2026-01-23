@@ -15,7 +15,7 @@ import {
 } from './completionData.js';
 import { CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext, inferTypeContextFromText, inferTypeContextInFunctionBody, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
+import { inferTypeContext, inferTypeContextFromText, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
 import type { ResolvedField } from '../schema/SchemaTypes.js';
 import { FunctionRegistry } from '../schema/FunctionRegistry.js';
 
@@ -31,16 +31,21 @@ type CompletionContext =
   | 'orderArgs'
   | 'general';
 
+export interface AutocompleteOptions {
+  typeHint?: string | null;
+}
+
 export function getAutocompleteSuggestions(
   source: string,
   root: SyntaxNode,
   position: Position,
-  schemaLoader?: SchemaLoader
+  schemaLoader?: SchemaLoader,
+  options?: AutocompleteOptions
 ): CompletionItem[] {
   const context = determineCompletionContext(source, root, position);
   const functionRegistry = new FunctionRegistry();
   functionRegistry.extractFromAST(root, schemaLoader);
-  return getCompletionsForContext(context, source, root, position, schemaLoader, functionRegistry);
+  return getCompletionsForContext(context, source, root, position, schemaLoader, functionRegistry, options?.typeHint ?? null);
 }
 
 function determineCompletionContext(
@@ -149,7 +154,8 @@ function getCompletionsForContext(
   root: SyntaxNode,
   position: Position,
   schemaLoader?: SchemaLoader,
-  functionRegistry?: FunctionRegistry
+  functionRegistry?: FunctionRegistry,
+  typeHint?: string | null
 ): CompletionItem[] {
   const word = getWordAtPosition(source, position);
   const node = getNodeAtPosition(root, position);
@@ -192,7 +198,7 @@ function getCompletionsForContext(
       return [
         ...getFilterStartCompletions(),
         ...getSchemaTypeCompletions(source, position, schemaLoader),
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
         ...getKeywordCompletions(),
         ...funcCompletions,
         ...customFunctionCompletions,
@@ -202,14 +208,14 @@ function getCompletionsForContext(
     case 'insideProjection':
       return [
         ...getProjectionCompletions(),
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
         ...funcCompletions,
         ...customFunctionCompletions,
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
 
     case 'afterDot':
       return [
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
         ...getFieldCompletions(),
         ...getSpecialCharCompletions().filter((c) => c.label === '@' || c.label === '^'),
       ];
@@ -231,7 +237,7 @@ function getCompletionsForContext(
 
     case 'functionArgs':
       return [
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
         ...getFieldCompletions(),
         ...getVariableCompletions(root),
       ];
@@ -339,27 +345,48 @@ function getSchemaFieldCompletions(
   position: Position,
   node: SyntaxNode | null,
   schemaLoader?: SchemaLoader,
-  functionRegistry?: FunctionRegistry
+  functionRegistry?: FunctionRegistry,
+  typeHint?: string | null
 ): CompletionItem[] {
   if (!schemaLoader?.isLoaded()) return [];
 
-  // Check if we're inside a function body - use function-aware inference
   let context = null;
-  if (node && functionRegistry) {
+
+  // Priority 1: Check for explicit _type filter in query
+  if (node) {
+    context = inferTypeFromExplicitFilter(node, schemaLoader);
+  }
+  if (!context?.type) {
+    // Also try text-based _type pattern matching
+    const textContext = inferTypeContextFromText(source, position, schemaLoader);
+    if (textContext?.type) {
+      context = textContext;
+    }
+  }
+
+  // Priority 2: Use type hint if provided
+  if (!context?.type && typeHint) {
+    const hintedType = schemaLoader.getType(typeHint);
+    if (hintedType) {
+      context = {
+        type: hintedType,
+        field: null,
+        isArray: false,
+        documentTypes: [typeHint],
+      };
+    }
+  }
+
+  // Priority 3: Other inference (function body, nested projections, array fields)
+  if (!context?.type && node && functionRegistry) {
     const funcDef = functionRegistry.isInsideFunctionBody(node);
     if (funcDef) {
       context = inferTypeContextInFunctionBody(node, funcDef, functionRegistry, schemaLoader);
     }
   }
 
-  // Try AST-based inference if not in function body or no context found
   if (!context?.type && node) {
     context = inferTypeContext(node, schemaLoader);
-  }
-
-  // If AST-based inference didn't find a specific type, try text-based inference
-  if (!context?.type) {
-    context = inferTypeContextFromText(source, position, schemaLoader);
   }
 
   if (!context) return [];

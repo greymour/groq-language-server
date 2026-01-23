@@ -80,6 +80,29 @@ function findArrayItemType(fieldName: string, schemaLoader: SchemaLoader): Resol
   return null;
 }
 
+export function inferTypeFromExplicitFilter(
+  node: SyntaxNode,
+  schemaLoader: SchemaLoader
+): InferredContext | null {
+  const typeFilter = findTypeFilter(node);
+  if (typeFilter) {
+    const typeName = extractTypeName(typeFilter);
+    if (typeName) {
+      const type = schemaLoader.getType(typeName);
+      if (type) {
+        const context: InferredContext = {
+          type,
+          field: null,
+          isArray: false,
+          documentTypes: [typeName],
+        };
+        return finalizeContext(context, node, schemaLoader);
+      }
+    }
+  }
+  return null;
+}
+
 export function inferTypeContext(
   node: SyntaxNode,
   schemaLoader: SchemaLoader
@@ -91,8 +114,13 @@ export function inferTypeContext(
     documentTypes: [],
   };
 
-  // Check nested projections first (most specific context)
-  // Check if we're inside a nested field projection (e.g., `video { }`)
+  // Check for explicit _type filter first
+  const filterContext = inferTypeFromExplicitFilter(node, schemaLoader);
+  if (filterContext?.type) {
+    return filterContext;
+  }
+
+  // Check nested projections (e.g., `video { }`)
   const nestedFieldType = inferNestedFieldType(node, schemaLoader);
   if (nestedFieldType) {
     context.type = nestedFieldType;
@@ -107,16 +135,6 @@ export function inferTypeContext(
     context.documentTypes = [arrayFieldType.name];
     context.isArray = true;
     return finalizeContext(context, node, schemaLoader);
-  }
-
-  // Fall back to explicit _type filter
-  const typeFilter = findTypeFilter(node);
-  if (typeFilter) {
-    const typeName = extractTypeName(typeFilter);
-    if (typeName) {
-      context.type = schemaLoader.getType(typeName) ?? null;
-      context.documentTypes = [typeName];
-    }
   }
 
   if (!context.type) {

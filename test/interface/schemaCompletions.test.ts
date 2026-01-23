@@ -91,6 +91,58 @@ describe('Schema-aware completions', () => {
       expect(completions.some(c => c.label === '_id')).toBe(true);
     });
   });
+
+  describe('type hint support', () => {
+    it('uses typeHint for field completions in fragments without type filter', () => {
+      // Fragment query without _type filter - normally wouldn't get specific type completions
+      const query = '{ t';
+      const result = parser.parse(query);
+      // With typeHint set to 'post', should get post fields
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: 3 },
+        schemaLoader,
+        { typeHint: 'post' }
+      );
+
+      // Should have title from post type (matches 't' prefix)
+      expect(completions.some(c => c.label === 'title')).toBe(true);
+    });
+
+    it('uses typeHint for author type fields', () => {
+      const query = '{ n';
+      const result = parser.parse(query);
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: 3 },
+        schemaLoader,
+        { typeHint: 'author' }
+      );
+
+      // Should have 'name' from author type
+      expect(completions.some(c => c.label === 'name')).toBe(true);
+    });
+
+    it('prefers inferred type over typeHint when both available', () => {
+      // Query with explicit _type filter
+      const query = '*[_type == "post"]{ n';
+      const result = parser.parse(query);
+      // Even with author typeHint, should use post type from filter
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: query.length },
+        schemaLoader,
+        { typeHint: 'author' }
+      );
+
+      // Should NOT have 'name' since post type doesn't have that field
+      // (name is on author type, not post)
+      expect(completions.some(c => c.label === 'name')).toBe(false);
+    });
+  });
 });
 
 describe('Schema-aware hover', () => {

@@ -5,7 +5,7 @@ import { nodeToRange } from '../parser/ASTTypes.js';
 import { toLSPRange } from '../utils/Range.js';
 import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils.js';
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext, inferTypeContextInFunctionBody, getAvailableFields } from '../schema/TypeInference.js';
+import { inferTypeContext, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields } from '../schema/TypeInference.js';
 import { FunctionRegistry } from '../schema/FunctionRegistry.js';
 
 const PRIMITIVE_TYPES = new Set([
@@ -36,6 +36,7 @@ function getBuiltInFieldType(fieldName: string): string | undefined {
 export interface DiagnosticsOptions {
   schemaLoader?: SchemaLoader;
   source?: string;
+  typeHint?: string | null;
 }
 
 export function getDiagnostics(
@@ -64,14 +65,16 @@ export function getDiagnostics(
     const schemaErrors = validateFieldReferences(
       parseResult.tree.rootNode,
       options.schemaLoader,
-      functionRegistry
+      functionRegistry,
+      options.typeHint ?? null
     );
     diagnostics.push(...schemaErrors);
 
     const primitiveProjectionErrors = validatePrimitiveProjections(
       parseResult.tree.rootNode,
       options.schemaLoader,
-      functionRegistry
+      functionRegistry,
+      options.typeHint ?? null
     );
     diagnostics.push(...primitiveProjectionErrors);
   }
@@ -82,7 +85,8 @@ export function getDiagnostics(
 function validateFieldReferences(
   root: SyntaxNode,
   schemaLoader: SchemaLoader,
-  functionRegistry: FunctionRegistry
+  functionRegistry: FunctionRegistry,
+  typeHint: string | null
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const checkedNodes = new Set<number>();
@@ -125,16 +129,33 @@ function validateFieldReferences(
     const projection = findAncestorOfType(node, ['projection']);
     if (!projection) return;
 
-    // Check if we're inside a function body - use function-aware inference
-    const funcDef = functionRegistry.isInsideFunctionBody(node);
-    let context;
-    if (funcDef) {
-      context = inferTypeContextInFunctionBody(node, funcDef, functionRegistry, schemaLoader);
-    } else {
-      context = inferTypeContext(node, schemaLoader);
+    // Priority 1: Check for explicit _type filter in query
+    let context = inferTypeFromExplicitFilter(node, schemaLoader);
+
+    // Priority 2: Use type hint if provided
+    if (!context?.type && typeHint) {
+      const hintedType = schemaLoader.getType(typeHint);
+      if (hintedType) {
+        context = {
+          type: hintedType,
+          field: null,
+          isArray: false,
+          documentTypes: [typeHint],
+        };
+      }
     }
 
-    if (!context.type) return;
+    // Priority 3: Other inference (function body, nested projections, array fields)
+    if (!context?.type) {
+      const funcDef = functionRegistry.isInsideFunctionBody(node);
+      if (funcDef) {
+        context = inferTypeContextInFunctionBody(node, funcDef, functionRegistry, schemaLoader);
+      } else {
+        context = inferTypeContext(node, schemaLoader);
+      }
+    }
+
+    if (!context?.type) return;
 
     // Get available fields for this type
     const availableFields = getAvailableFields(context, schemaLoader);
@@ -157,7 +178,8 @@ function validateFieldReferences(
 function validatePrimitiveProjections(
   root: SyntaxNode,
   schemaLoader: SchemaLoader,
-  functionRegistry: FunctionRegistry
+  functionRegistry: FunctionRegistry,
+  typeHint: string | null
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const checkedNodes = new Set<number>();
@@ -192,16 +214,33 @@ function validatePrimitiveProjections(
     const parentProjection = findAncestorOfType(node, ['projection']);
     if (!parentProjection) return;
 
-    // Check if we're inside a function body - use function-aware inference
-    const funcDef = functionRegistry.isInsideFunctionBody(node);
-    let context;
-    if (funcDef) {
-      context = inferTypeContextInFunctionBody(parentProjection, funcDef, functionRegistry, schemaLoader);
-    } else {
-      context = inferTypeContext(parentProjection, schemaLoader);
+    // Priority 1: Check for explicit _type filter in query
+    let context = inferTypeFromExplicitFilter(parentProjection, schemaLoader);
+
+    // Priority 2: Use type hint if provided
+    if (!context?.type && typeHint) {
+      const hintedType = schemaLoader.getType(typeHint);
+      if (hintedType) {
+        context = {
+          type: hintedType,
+          field: null,
+          isArray: false,
+          documentTypes: [typeHint],
+        };
+      }
     }
 
-    if (!context.type) return;
+    // Priority 3: Other inference (function body, nested projections, array fields)
+    if (!context?.type) {
+      const funcDef = functionRegistry.isInsideFunctionBody(node);
+      if (funcDef) {
+        context = inferTypeContextInFunctionBody(parentProjection, funcDef, functionRegistry, schemaLoader);
+      } else {
+        context = inferTypeContext(parentProjection, schemaLoader);
+      }
+    }
+
+    if (!context?.type) return;
 
     // Look up the field in the parent type
     const field = schemaLoader.getField(context.type.name, fieldName);

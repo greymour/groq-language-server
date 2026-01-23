@@ -12,12 +12,14 @@ export interface EmbeddedQuery {
   parseResult: ParseResult;
   hasInterpolations: boolean;
   interpolationRanges: InterpolationRange[];
+  typeHint: string | null;
 }
 
 interface TagLocation {
   content: string;
   start: Position;
   end: Position;
+  typeHint: string | null;
 }
 
 export function findGroqTags(source: string): EmbeddedQuery[] {
@@ -34,6 +36,7 @@ export function findGroqTags(source: string): EmbeddedQuery[] {
       parseResult: parser.parse(finalContent),
       hasInterpolations,
       interpolationRanges,
+      typeHint: loc.typeHint,
     };
   });
 }
@@ -104,23 +107,54 @@ function wrapFragment(content: string): string {
 function extractGroqTagLocations(source: string): TagLocation[] {
   const locations: TagLocation[] = [];
 
-  const patterns = [
-    /groq\s*`([^`]*)`/g,                      // groq`...`
-    /defineQuery\s*\(\s*`([^`]*)`\s*\)/g,     // defineQuery(`...`)
-    /\/\*\s*groq\s*\*\/\s*`([^`]*)`/g,        // /* groq */ `...`
+  const patterns: Array<{ regex: RegExp; extractTypeHint: (source: string, matchIndex: number, match?: RegExpExecArray) => string | null }> = [
+    {
+      // groq`...` - check for @type comment before it
+      regex: /groq\s*`([^`]*)`/g,
+      extractTypeHint: (src, idx) => {
+        const before = src.slice(Math.max(0, idx - 100), idx);
+        const blockMatch = before.match(/\/\*\s*@type\s+([_A-Za-z][_0-9A-Za-z]*)\s*\*\/\s*$/);
+        if (blockMatch) return blockMatch[1];
+        const lineMatch = before.match(/\/\/\s*@type\s+([_A-Za-z][_0-9A-Za-z]*)\s*\n\s*$/);
+        if (lineMatch) return lineMatch[1];
+        return null;
+      },
+    },
+    {
+      // defineQuery(`...`) - check for @type comment before it
+      regex: /defineQuery\s*\(\s*`([^`]*)`\s*\)/g,
+      extractTypeHint: (src, idx) => {
+        const before = src.slice(Math.max(0, idx - 100), idx);
+        const blockMatch = before.match(/\/\*\s*@type\s+([_A-Za-z][_0-9A-Za-z]*)\s*\*\/\s*$/);
+        if (blockMatch) return blockMatch[1];
+        const lineMatch = before.match(/\/\/\s*@type\s+([_A-Za-z][_0-9A-Za-z]*)\s*\n\s*$/);
+        if (lineMatch) return lineMatch[1];
+        return null;
+      },
+    },
+    {
+      // /* groq */ `...` - check for @type comment between groq and backtick
+      regex: /\/\*\s*groq\s*\*\/\s*(\/\*\s*@type\s+([_A-Za-z][_0-9A-Za-z]*)\s*\*\/\s*)?`([^`]*)`/g,
+      extractTypeHint: (_src, _idx, match) => match?.[2] ?? null,
+    },
   ];
 
-  for (const regex of patterns) {
+  for (const { regex, extractTypeHint } of patterns) {
     let match: RegExpExecArray | null;
     while ((match = regex.exec(source)) !== null) {
       const fullMatch = match[0];
-      const content = match[1];
+      // For the /* groq */ pattern, content is in group 3; for others, group 1
+      const content = match[3] ?? match[1];
       const startOffset = match.index + fullMatch.indexOf('`') + 1;
+
+      // Extract type hint - pass match for patterns that capture it directly
+      const typeHint = extractTypeHint(source, match.index, match);
 
       locations.push({
         content,
         start: offsetToPosition(source, startOffset),
         end: offsetToPosition(source, startOffset + content.length),
+        typeHint,
       });
     }
   }
