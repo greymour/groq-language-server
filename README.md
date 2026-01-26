@@ -64,6 +64,13 @@ use {
 }
 ```
 
+**Note:** Plugin managers only install the Lua files. You must also build and link the language server binary:
+
+```bash
+cd ~/.local/share/nvim/lazy/groq-language-server  # or your plugin directory
+npm install && npm run build && npm link
+```
+
 #### Manual Installation
 
 1. Add the plugin path to your runtimepath:
@@ -131,6 +138,8 @@ require("groq-lsp").setup({
 
 #### Building the Extension
 
+From the repository root:
+
 ```bash
 cd editors/vscode
 npm install
@@ -138,9 +147,20 @@ npm run build
 npm run package
 ```
 
-This creates a `.vsix` file you can install.
+This creates a `.vsix` file you can install. The build process automatically installs and builds the language server dependencies.
 
 #### Installing the Extension
+
+The easiest way to build and install (or update) the extension is using the install script:
+
+```bash
+./scripts/install-extension.sh vscode  # For Visual Studio Code
+./scripts/install-extension.sh cursor  # For Cursor
+```
+
+This script builds, packages, and installs the extension in one step.
+
+Alternatively, you can install manually:
 
 1. Open VSCode/Cursor
 2. Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
@@ -151,6 +171,7 @@ Or from the command line:
 
 ```bash
 code --install-extension editors/vscode/groq-vscode-0.1.0.vsix
+cursor --install-extension editors/vscode/groq-vscode-0.1.0.vsix
 ```
 
 #### VSCode Configuration
