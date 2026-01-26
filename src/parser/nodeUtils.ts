@@ -1,4 +1,4 @@
-import type { SyntaxNode, Position, GroqNodeType } from './ASTTypes.js';
+import type { SyntaxNode, Position, GroqNodeType } from './ASTTypes';
 
 export function getNodeAtPosition(
   root: SyntaxNode,

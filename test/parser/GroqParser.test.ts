@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GroqParser } from '../../src/parser/GroqParser.js';
+import { GroqParser } from '../../src/parser/GroqParser';
 
 describe('GroqParser', () => {
   const parser = new GroqParser();

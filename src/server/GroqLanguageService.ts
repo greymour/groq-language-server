@@ -7,17 +7,17 @@ import type {
   SymbolInformation,
   Location,
 } from 'vscode-languageserver';
-import { DocumentCache } from './DocumentCache.js';
-import { getDiagnostics } from '../interface/getDiagnostics.js';
-import { getAutocompleteSuggestions } from '../interface/getAutocompleteSuggestions.js';
-import { getHoverInformation } from '../interface/getHoverInformation.js';
-import { getOutline } from '../interface/getOutline.js';
-import { getDefinition } from '../interface/getDefinition.js';
-import type { EmbeddedQuery, InterpolationRange } from '../embedded/findGroqTags.js';
-import { findGroqTags } from '../embedded/findGroqTags.js';
-import { SchemaLoader } from '../schema/SchemaLoader.js';
-import type { SchemaValidationConfig } from '../schema/SchemaLoader.js';
-import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../extensions/index.js';
+import { DocumentCache } from './DocumentCache';
+import { getDiagnostics } from '../interface/getDiagnostics';
+import { getAutocompleteSuggestions } from '../interface/getAutocompleteSuggestions';
+import { getHoverInformation } from '../interface/getHoverInformation';
+import { getOutline } from '../interface/getOutline';
+import { getDefinition } from '../interface/getDefinition';
+import type { EmbeddedQuery, InterpolationRange } from '../embedded/findGroqTags';
+import { findGroqTags } from '../embedded/findGroqTags';
+import { SchemaLoader } from '../schema/SchemaLoader';
+import type { SchemaValidationConfig } from '../schema/SchemaLoader';
+import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../extensions/index';
 
 export type { SchemaValidationConfig };
 

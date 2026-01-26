@@ -1,7 +1,7 @@
 import type { CompletionItem, Position } from 'vscode-languageserver';
-import type { SyntaxNode } from '../parser/ASTTypes.js';
-import { getNodeAtPosition, findAncestorOfType, getFieldNode } from '../parser/nodeUtils.js';
-import { getCharacterBeforePosition, getWordAtPosition, getNamespacePrefixAtPosition } from '../utils/positionUtils.js';
+import type { SyntaxNode } from '../parser/ASTTypes';
+import { getNodeAtPosition, findAncestorOfType, getFieldNode } from '../parser/nodeUtils';
+import { getCharacterBeforePosition, getWordAtPosition, getNamespacePrefixAtPosition } from '../utils/positionUtils';
 import {
   getFunctionCompletions,
   getKeywordCompletions,
@@ -12,13 +12,13 @@ import {
   getAfterEverythingCompletions,
   GROQ_FUNCTIONS,
   GROQ_NAMESPACED_FUNCTIONS,
-} from './completionData.js';
+} from './completionData';
 import { CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
-import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext, inferTypeContextFromText, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
-import type { ResolvedField } from '../schema/SchemaTypes.js';
-import { FunctionRegistry } from '../schema/FunctionRegistry.js';
-import type { ExtensionRegistry } from '../extensions/index.js';
+import type { SchemaLoader } from '../schema/SchemaLoader';
+import { inferTypeContext, inferTypeContextFromText, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference';
+import type { ResolvedField } from '../schema/SchemaTypes';
+import { FunctionRegistry } from '../schema/FunctionRegistry';
+import type { ExtensionRegistry } from '../extensions/index';
 
 type CompletionContext =
   | 'empty'

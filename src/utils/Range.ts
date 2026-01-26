@@ -1,4 +1,4 @@
-import type { Position, Range } from '../parser/ASTTypes.js';
+import type { Position, Range } from '../parser/ASTTypes';
 import type { Range as LSPRange, Position as LSPPosition } from 'vscode-languageserver';
 
 export function toLSPPosition(position: Position): LSPPosition {

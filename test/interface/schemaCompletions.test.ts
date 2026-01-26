@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { GroqParser } from '../../src/parser/GroqParser.js';
-import { getAutocompleteSuggestions } from '../../src/interface/getAutocompleteSuggestions.js';
-import { getHoverInformation } from '../../src/interface/getHoverInformation.js';
-import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
+import { GroqParser } from '../../src/parser/GroqParser';
+import { getAutocompleteSuggestions } from '../../src/interface/getAutocompleteSuggestions';
+import { getHoverInformation } from '../../src/interface/getHoverInformation';
+import { SchemaLoader } from '../../src/schema/SchemaLoader';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 

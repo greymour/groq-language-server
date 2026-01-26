@@ -1,2 +1,2 @@
-export * from './findGroqTags.js';
-export * from './RangeMapping.js';
+export * from './findGroqTags';
+export * from './RangeMapping';

@@ -1,6 +1,6 @@
 import type { Diagnostic } from 'vscode-languageserver';
 import { DiagnosticSeverity } from 'vscode-languageserver';
-import type { DiagnosticsContext } from '../index.js';
+import type { DiagnosticsContext } from '../index';
 
 /**
  * Validate that all declared parameter types exist in the schema.

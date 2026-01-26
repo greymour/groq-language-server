@@ -1,4 +1,4 @@
-import type { Position, Range } from '../parser/ASTTypes.js';
+import type { Position, Range } from '../parser/ASTTypes';
 
 export interface RangeMapper {
   toEmbedded(position: Position): Position;

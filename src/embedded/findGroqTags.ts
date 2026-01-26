@@ -1,5 +1,5 @@
-import type { ParseResult, Range, Position } from '../parser/ASTTypes.js';
-import { getSharedParser } from '../parser/GroqParser.js';
+import type { ParseResult, Range, Position } from '../parser/ASTTypes';
+import { getSharedParser } from '../parser/GroqParser';
 
 export interface InterpolationRange {
   start: Position;

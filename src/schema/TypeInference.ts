@@ -1,8 +1,8 @@
-import type { SyntaxNode } from '../parser/ASTTypes.js';
-import { getFieldNode, findAncestorOfType, walkTree } from '../parser/nodeUtils.js';
-import type { SchemaLoader } from './SchemaLoader.js';
-import type { ResolvedType, ResolvedField } from './SchemaTypes.js';
-import type { FunctionRegistry, FunctionDefinition } from './FunctionRegistry.js';
+import type { SyntaxNode } from '../parser/ASTTypes';
+import { getFieldNode, findAncestorOfType, walkTree } from '../parser/nodeUtils';
+import type { SchemaLoader } from './SchemaLoader';
+import type { ResolvedType, ResolvedField } from './SchemaTypes';
+import type { FunctionRegistry, FunctionDefinition } from './FunctionRegistry';
 
 export interface InferredContext {
   type: ResolvedType | null;

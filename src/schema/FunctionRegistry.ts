@@ -1,8 +1,8 @@
-import type { SyntaxNode } from '../parser/ASTTypes.js';
-import { walkTree, getFieldNode, findAncestorOfType } from '../parser/nodeUtils.js';
-import type { SchemaLoader } from './SchemaLoader.js';
-import { inferTypeContext } from './TypeInference.js';
-import type { ExtensionRegistry } from '../extensions/index.js';
+import type { SyntaxNode } from '../parser/ASTTypes';
+import { walkTree, getFieldNode, findAncestorOfType } from '../parser/nodeUtils';
+import type { SchemaLoader } from './SchemaLoader';
+import { inferTypeContext } from './TypeInference';
+import type { ExtensionRegistry } from '../extensions/index';
 
 export interface FunctionParameter {
   name: string;

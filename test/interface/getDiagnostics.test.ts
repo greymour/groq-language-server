@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { GroqParser } from '../../src/parser/GroqParser.js';
-import { getDiagnostics } from '../../src/interface/getDiagnostics.js';
-import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
-import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index.js';
+import { GroqParser } from '../../src/parser/GroqParser';
+import { getDiagnostics } from '../../src/interface/getDiagnostics';
+import { SchemaLoader } from '../../src/schema/SchemaLoader';
+import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 

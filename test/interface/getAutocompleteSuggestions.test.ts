@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { GroqParser } from '../../src/parser/GroqParser.js';
-import { getAutocompleteSuggestions } from '../../src/interface/getAutocompleteSuggestions.js';
+import { GroqParser } from '../../src/parser/GroqParser';
+import { getAutocompleteSuggestions } from '../../src/interface/getAutocompleteSuggestions';
 
 describe('getAutocompleteSuggestions', () => {
   const parser = new GroqParser();

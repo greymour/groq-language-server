@@ -11,7 +11,7 @@ import type {
   DidCloseTextDocumentParams,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { GroqLanguageService } from './GroqLanguageService.js';
+import { GroqLanguageService } from './GroqLanguageService';
 
 export class MessageProcessor {
   private connection: Connection;

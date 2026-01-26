@@ -1,13 +1,13 @@
 import type { Hover, Position, MarkupContent } from 'vscode-languageserver';
 import { MarkupKind } from 'vscode-languageserver';
-import type { SyntaxNode } from '../parser/ASTTypes.js';
-import { nodeToRange } from '../parser/ASTTypes.js';
-import { getNamedNodeAtPosition } from '../parser/nodeUtils.js';
-import { toLSPRange } from '../utils/Range.js';
-import { GROQ_FUNCTIONS, GROQ_NAMESPACED_FUNCTIONS, GROQ_KEYWORDS } from './completionData.js';
-import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext } from '../schema/TypeInference.js';
-import { FunctionRegistry } from '../schema/FunctionRegistry.js';
+import type { SyntaxNode } from '../parser/ASTTypes';
+import { nodeToRange } from '../parser/ASTTypes';
+import { getNamedNodeAtPosition } from '../parser/nodeUtils';
+import { toLSPRange } from '../utils/Range';
+import { GROQ_FUNCTIONS, GROQ_NAMESPACED_FUNCTIONS, GROQ_KEYWORDS } from './completionData';
+import type { SchemaLoader } from '../schema/SchemaLoader';
+import { inferTypeContext } from '../schema/TypeInference';
+import { FunctionRegistry } from '../schema/FunctionRegistry';
 
 export function getHoverInformation(
   _source: string,

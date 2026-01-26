@@ -1,13 +1,13 @@
 import type { Diagnostic } from 'vscode-languageserver';
 import { DiagnosticSeverity } from 'vscode-languageserver';
-import type { ParseResult, SyntaxNode } from '../parser/ASTTypes.js';
-import { nodeToRange } from '../parser/ASTTypes.js';
-import { toLSPRange } from '../utils/Range.js';
-import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils.js';
-import type { SchemaLoader } from '../schema/SchemaLoader.js';
-import { inferTypeContext, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields } from '../schema/TypeInference.js';
-import { FunctionRegistry } from '../schema/FunctionRegistry.js';
-import type { ExtensionRegistry } from '../extensions/index.js';
+import type { ParseResult, SyntaxNode } from '../parser/ASTTypes';
+import { nodeToRange } from '../parser/ASTTypes';
+import { toLSPRange } from '../utils/Range';
+import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils';
+import type { SchemaLoader } from '../schema/SchemaLoader';
+import { inferTypeContext, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields } from '../schema/TypeInference';
+import { FunctionRegistry } from '../schema/FunctionRegistry';
+import type { ExtensionRegistry } from '../extensions/index';
 
 const PRIMITIVE_TYPES = new Set([
   'string',

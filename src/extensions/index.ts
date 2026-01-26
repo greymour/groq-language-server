@@ -1,6 +1,6 @@
 import type { Diagnostic } from 'vscode-languageserver';
-import type { FunctionDefinition, FunctionParameter } from '../schema/FunctionRegistry.js';
-import type { SchemaLoader } from '../schema/SchemaLoader.js';
+import type { FunctionDefinition, FunctionParameter } from '../schema/FunctionRegistry';
+import type { SchemaLoader } from '../schema/SchemaLoader';
 
 /**
  * Lifecycle hooks that extensions can implement to integrate with the language server.
@@ -139,5 +139,5 @@ export interface ExtensionConfig {
   options?: Record<string, unknown>;
 }
 
-export { ExtensionRegistry } from './ExtensionRegistry.js';
-export { paramTypeAnnotationsExtension } from './paramTypeAnnotations/index.js';
+export { ExtensionRegistry } from './ExtensionRegistry';
+export { paramTypeAnnotationsExtension } from './paramTypeAnnotations/index';

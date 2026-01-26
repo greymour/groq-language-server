@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import type { SanitySchema, SchemaType, ResolvedType, ResolvedField } from './SchemaTypes.js';
-import { isDocumentType, isReferenceField, isArrayField, getReferenceTargets, getArrayItemTypes } from './SchemaTypes.js';
+import type { SanitySchema, SchemaType, ResolvedType, ResolvedField } from './SchemaTypes';
+import { isDocumentType, isReferenceField, isArrayField, getReferenceTargets, getArrayItemTypes } from './SchemaTypes';
 
 export interface SchemaValidationConfig {
   enabled?: boolean;

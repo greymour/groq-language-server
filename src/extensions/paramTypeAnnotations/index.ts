@@ -1,6 +1,6 @@
-import type { Extension } from '../index.js';
-import { parseParamAnnotations } from './parser.js';
-import { validateParamTypes } from './diagnostics.js';
+import type { Extension } from '../index';
+import { parseParamAnnotations } from './parser';
+import { validateParamTypes } from './diagnostics';
 
 /**
  * Extension that enables JSDoc-style parameter type annotations for GROQ functions.
@@ -51,5 +51,5 @@ export const paramTypeAnnotationsExtension: Extension = {
   },
 };
 
-export { parseParamAnnotations } from './parser.js';
-export { validateParamTypes } from './diagnostics.js';
+export { parseParamAnnotations } from './parser';
+export { validateParamTypes } from './diagnostics';

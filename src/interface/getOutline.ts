@@ -1,9 +1,9 @@
 import type { SymbolInformation } from 'vscode-languageserver';
 import { SymbolKind } from 'vscode-languageserver';
-import type { SyntaxNode } from '../parser/ASTTypes.js';
-import { nodeToRange } from '../parser/ASTTypes.js';
-import { toLSPRange } from '../utils/Range.js';
-import { walkTree, getFieldNode } from '../parser/nodeUtils.js';
+import type { SyntaxNode } from '../parser/ASTTypes';
+import { nodeToRange } from '../parser/ASTTypes';
+import { toLSPRange } from '../utils/Range';
+import { walkTree, getFieldNode } from '../parser/nodeUtils';
 
 export function getOutline(root: SyntaxNode, uri: string): SymbolInformation[] {
   const symbols: SymbolInformation[] = [];

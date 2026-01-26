@@ -1,7 +1,7 @@
 import Parser from 'tree-sitter';
-import type { Tree, SyntaxNode, ParseResult, ParseError, Range } from './ASTTypes.js';
-import { nodeToRange } from './ASTTypes.js';
-import { collectAllErrors } from './nodeUtils.js';
+import type { Tree, SyntaxNode, ParseResult, ParseError, Range } from './ASTTypes';
+import { nodeToRange } from './ASTTypes';
+import { collectAllErrors } from './nodeUtils';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const GroqLanguage = require('tree-sitter-groq') as Parser.Language;

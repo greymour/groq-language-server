@@ -1,8 +1,8 @@
 import {
   createConnection,
   ProposedFeatures,
-} from 'vscode-languageserver/node.js';
-import { MessageProcessor } from './MessageProcessor.js';
+} from 'vscode-languageserver/node';
+import { MessageProcessor } from './MessageProcessor';
 
 export interface ServerOptions {
   method: 'stdio' | 'node';

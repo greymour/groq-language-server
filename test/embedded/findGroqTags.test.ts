@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findGroqTags, isInsideGroqTag } from '../../src/embedded/findGroqTags.js';
+import { findGroqTags, isInsideGroqTag } from '../../src/embedded/findGroqTags';
 
 describe('findGroqTags', () => {
   it('finds groq tagged template literals', () => {

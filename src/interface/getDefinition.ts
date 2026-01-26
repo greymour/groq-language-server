@@ -1,9 +1,9 @@
 import type { Location, Position } from 'vscode-languageserver';
-import type { SyntaxNode } from '../parser/ASTTypes.js';
-import { nodeToRange } from '../parser/ASTTypes.js';
-import { getNamedNodeAtPosition, walkTree } from '../parser/nodeUtils.js';
-import { toLSPRange } from '../utils/Range.js';
-import { FunctionRegistry } from '../schema/FunctionRegistry.js';
+import type { SyntaxNode } from '../parser/ASTTypes';
+import { nodeToRange } from '../parser/ASTTypes';
+import { getNamedNodeAtPosition, walkTree } from '../parser/nodeUtils';
+import { toLSPRange } from '../utils/Range';
+import { FunctionRegistry } from '../schema/FunctionRegistry';
 
 export function getDefinition(
   _source: string,

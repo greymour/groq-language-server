@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
+import { SchemaLoader } from '../../src/schema/SchemaLoader';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

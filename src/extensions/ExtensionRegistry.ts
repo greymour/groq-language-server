@@ -1,4 +1,4 @@
-import type { Extension, ExtensionConfig, Hooks } from './index.js';
+import type { Extension, ExtensionConfig, Hooks } from './index';
 
 /**
  * Manages registration and lifecycle of extensions.

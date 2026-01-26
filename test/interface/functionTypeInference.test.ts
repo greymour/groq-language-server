@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { GroqParser } from '../../src/parser/GroqParser.js';
-import { getDiagnostics } from '../../src/interface/getDiagnostics.js';
-import { getAutocompleteSuggestions } from '../../src/interface/getAutocompleteSuggestions.js';
-import { getHoverInformation } from '../../src/interface/getHoverInformation.js';
-import { getDefinition } from '../../src/interface/getDefinition.js';
-import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
-import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index.js';
+import { GroqParser } from '../../src/parser/GroqParser';
+import { getDiagnostics } from '../../src/interface/getDiagnostics';
+import { getAutocompleteSuggestions } from '../../src/interface/getAutocompleteSuggestions';
+import { getHoverInformation } from '../../src/interface/getHoverInformation';
+import { getDefinition } from '../../src/interface/getDefinition';
+import { SchemaLoader } from '../../src/schema/SchemaLoader';
+import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 

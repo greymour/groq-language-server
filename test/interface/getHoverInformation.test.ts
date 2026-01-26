@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { GroqParser } from '../../src/parser/GroqParser.js';
-import { getHoverInformation } from '../../src/interface/getHoverInformation.js';
+import { GroqParser } from '../../src/parser/GroqParser';
+import { getHoverInformation } from '../../src/interface/getHoverInformation';
 
 describe('getHoverInformation', () => {
   const parser = new GroqParser();

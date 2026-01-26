@@ -1,4 +1,4 @@
-import type { Position } from '../parser/ASTTypes.js';
+import type { Position } from '../parser/ASTTypes';
 
 export function offsetToPosition(text: string, offset: number): Position {
   let line = 0;

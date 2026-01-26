@@ -1,3 +1,3 @@
-export * from './ASTTypes.js';
-export * from './GroqParser.js';
-export * from './nodeUtils.js';
+export * from './ASTTypes';
+export * from './GroqParser';
+export * from './nodeUtils';

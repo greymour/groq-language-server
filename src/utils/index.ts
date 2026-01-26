@@ -1,2 +1,2 @@
-export * from './Range.js';
-export * from './positionUtils.js';
+export * from './Range';
+export * from './positionUtils';

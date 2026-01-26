@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { parseParamAnnotations } from '../../src/extensions/paramTypeAnnotations/parser.js';
-import { validateParamTypes } from '../../src/extensions/paramTypeAnnotations/diagnostics.js';
-import { paramTypeAnnotationsExtension } from '../../src/extensions/paramTypeAnnotations/index.js';
-import { ExtensionRegistry } from '../../src/extensions/ExtensionRegistry.js';
-import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
-import type { FunctionDefinition } from '../../src/schema/FunctionRegistry.js';
+import { parseParamAnnotations } from '../../src/extensions/paramTypeAnnotations/parser';
+import { validateParamTypes } from '../../src/extensions/paramTypeAnnotations/diagnostics';
+import { paramTypeAnnotationsExtension } from '../../src/extensions/paramTypeAnnotations/index';
+import { ExtensionRegistry } from '../../src/extensions/ExtensionRegistry';
+import { SchemaLoader } from '../../src/schema/SchemaLoader';
+import type { FunctionDefinition } from '../../src/schema/FunctionRegistry';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
