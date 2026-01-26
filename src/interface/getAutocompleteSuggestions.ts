@@ -31,21 +31,16 @@ type CompletionContext =
   | 'orderArgs'
   | 'general';
 
-export interface AutocompleteOptions {
-  typeHint?: string | null;
-}
-
 export function getAutocompleteSuggestions(
   source: string,
   root: SyntaxNode,
   position: Position,
-  schemaLoader?: SchemaLoader,
-  options?: AutocompleteOptions
+  schemaLoader?: SchemaLoader
 ): CompletionItem[] {
   const context = determineCompletionContext(source, root, position);
   const functionRegistry = new FunctionRegistry();
-  functionRegistry.extractFromAST(root, schemaLoader);
-  return getCompletionsForContext(context, source, root, position, schemaLoader, functionRegistry, options?.typeHint ?? null);
+  functionRegistry.extractFromAST(root, schemaLoader, source);
+  return getCompletionsForContext(context, source, root, position, schemaLoader, functionRegistry);
 }
 
 function determineCompletionContext(
@@ -154,8 +149,7 @@ function getCompletionsForContext(
   root: SyntaxNode,
   position: Position,
   schemaLoader?: SchemaLoader,
-  functionRegistry?: FunctionRegistry,
-  typeHint?: string | null
+  functionRegistry?: FunctionRegistry
 ): CompletionItem[] {
   const word = getWordAtPosition(source, position);
   const node = getNodeAtPosition(root, position);
@@ -198,7 +192,7 @@ function getCompletionsForContext(
       return [
         ...getFilterStartCompletions(),
         ...getSchemaTypeCompletions(source, position, schemaLoader),
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getKeywordCompletions(),
         ...funcCompletions,
         ...customFunctionCompletions,
@@ -208,14 +202,14 @@ function getCompletionsForContext(
     case 'insideProjection':
       return [
         ...getProjectionCompletions(),
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...funcCompletions,
         ...customFunctionCompletions,
       ].filter((item) => !word || item.label.toLowerCase().startsWith(word.toLowerCase()));
 
     case 'afterDot':
       return [
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getFieldCompletions(),
         ...getSpecialCharCompletions().filter((c) => c.label === '@' || c.label === '^'),
       ];
@@ -237,7 +231,7 @@ function getCompletionsForContext(
 
     case 'functionArgs':
       return [
-        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry, typeHint),
+        ...getSchemaFieldCompletions(source, position, node, schemaLoader, functionRegistry),
         ...getFieldCompletions(),
         ...getVariableCompletions(root),
       ];
@@ -345,8 +339,7 @@ function getSchemaFieldCompletions(
   position: Position,
   node: SyntaxNode | null,
   schemaLoader?: SchemaLoader,
-  functionRegistry?: FunctionRegistry,
-  typeHint?: string | null
+  functionRegistry?: FunctionRegistry
 ): CompletionItem[] {
   if (!schemaLoader?.isLoaded()) return [];
 
@@ -364,20 +357,7 @@ function getSchemaFieldCompletions(
     }
   }
 
-  // Priority 2: Use type hint if provided
-  if (!context?.type && typeHint) {
-    const hintedType = schemaLoader.getType(typeHint);
-    if (hintedType) {
-      context = {
-        type: hintedType,
-        field: null,
-        isArray: false,
-        documentTypes: [typeHint],
-      };
-    }
-  }
-
-  // Priority 3: Other inference (function body, nested projections, array fields)
+  // Priority 2: Other inference (function body with declared types, nested projections, array fields)
   if (!context?.type && node && functionRegistry) {
     const funcDef = functionRegistry.isInsideFunctionBody(node);
     if (funcDef) {

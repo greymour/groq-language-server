@@ -36,7 +36,6 @@ function getBuiltInFieldType(fieldName: string): string | undefined {
 export interface DiagnosticsOptions {
   schemaLoader?: SchemaLoader;
   source?: string;
-  typeHint?: string | null;
 }
 
 export function getDiagnostics(
@@ -56,33 +55,31 @@ export function getDiagnostics(
 
   // Always check for recursive function calls (doesn't require schema)
   const functionRegistry = new FunctionRegistry();
-  functionRegistry.extractFromAST(parseResult.tree.rootNode, options.schemaLoader);
+  functionRegistry.extractFromAST(parseResult.tree.rootNode, options.schemaLoader, options.source);
 
   const recursionErrors = validateNoRecursion(parseResult.tree.rootNode, functionRegistry);
   diagnostics.push(...recursionErrors);
 
-  // Validate type hint if provided
-  if (options.typeHint && options.schemaLoader?.isLoaded()) {
-    const typeHintError = validateTypeHint(options.typeHint, options.schemaLoader);
-    if (typeHintError) {
-      diagnostics.push(typeHintError);
-    }
-  }
-
+  // Validate declared parameter types exist in schema
   if (options.schemaLoader?.isLoaded() && options.source) {
+    const paramTypeErrors = validateDeclaredParameterTypes(
+      functionRegistry,
+      options.schemaLoader,
+      options.source
+    );
+    diagnostics.push(...paramTypeErrors);
+
     const schemaErrors = validateFieldReferences(
       parseResult.tree.rootNode,
       options.schemaLoader,
-      functionRegistry,
-      options.typeHint ?? null
+      functionRegistry
     );
     diagnostics.push(...schemaErrors);
 
     const primitiveProjectionErrors = validatePrimitiveProjections(
       parseResult.tree.rootNode,
       options.schemaLoader,
-      functionRegistry,
-      options.typeHint ?? null
+      functionRegistry
     );
     diagnostics.push(...primitiveProjectionErrors);
   }
@@ -93,8 +90,7 @@ export function getDiagnostics(
 function validateFieldReferences(
   root: SyntaxNode,
   schemaLoader: SchemaLoader,
-  functionRegistry: FunctionRegistry,
-  typeHint: string | null
+  functionRegistry: FunctionRegistry
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const checkedNodes = new Set<number>();
@@ -140,20 +136,7 @@ function validateFieldReferences(
     // Priority 1: Check for explicit _type filter in query
     let context = inferTypeFromExplicitFilter(node, schemaLoader);
 
-    // Priority 2: Use type hint if provided
-    if (!context?.type && typeHint) {
-      const hintedType = schemaLoader.getType(typeHint);
-      if (hintedType) {
-        context = {
-          type: hintedType,
-          field: null,
-          isArray: false,
-          documentTypes: [typeHint],
-        };
-      }
-    }
-
-    // Priority 3: Other inference (function body, nested projections, array fields)
+    // Priority 2: Other inference (function body with declared types, nested projections, array fields)
     if (!context?.type) {
       const funcDef = functionRegistry.isInsideFunctionBody(node);
       if (funcDef) {
@@ -186,8 +169,7 @@ function validateFieldReferences(
 function validatePrimitiveProjections(
   root: SyntaxNode,
   schemaLoader: SchemaLoader,
-  functionRegistry: FunctionRegistry,
-  typeHint: string | null
+  functionRegistry: FunctionRegistry
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const checkedNodes = new Set<number>();
@@ -225,20 +207,7 @@ function validatePrimitiveProjections(
     // Priority 1: Check for explicit _type filter in query
     let context = inferTypeFromExplicitFilter(parentProjection, schemaLoader);
 
-    // Priority 2: Use type hint if provided
-    if (!context?.type && typeHint) {
-      const hintedType = schemaLoader.getType(typeHint);
-      if (hintedType) {
-        context = {
-          type: hintedType,
-          field: null,
-          isArray: false,
-          documentTypes: [typeHint],
-        };
-      }
-    }
-
-    // Priority 3: Other inference (function body, nested projections, array fields)
+    // Priority 2: Other inference (function body with declared types, nested projections, array fields)
     if (!context?.type) {
       const funcDef = functionRegistry.isInsideFunctionBody(node);
       if (funcDef) {
@@ -301,19 +270,59 @@ function validateNoRecursion(
   return diagnostics;
 }
 
-function validateTypeHint(
-  typeHint: string,
-  schemaLoader: SchemaLoader
-): Diagnostic | null {
-  const type = schemaLoader.getType(typeHint);
-  if (!type) {
-    const availableTypes = schemaLoader.getTypeNames();
-    return {
-      severity: DiagnosticSeverity.Warning,
-      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
-      message: `Type "${typeHint}" not found in schema. Available types: ${availableTypes.join(', ')}`,
-      source: 'groq',
-    };
+function validateDeclaredParameterTypes(
+  functionRegistry: FunctionRegistry,
+  schemaLoader: SchemaLoader,
+  source: string
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  for (const funcDef of functionRegistry.getAllDefinitions()) {
+    for (const param of funcDef.parameters) {
+      if (param.declaredType && !schemaLoader.getType(param.declaredType)) {
+        const availableTypes = schemaLoader.getTypeNames();
+        const range = param.typeAnnotationRange
+          ? offsetRangeToLSPRange(source, param.typeAnnotationRange.startIndex, param.typeAnnotationRange.endIndex)
+          : { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+
+        diagnostics.push({
+          severity: DiagnosticSeverity.Warning,
+          range,
+          message: `Type "${param.declaredType}" not found in schema. Available types: ${availableTypes.join(', ')}`,
+          source: 'groq',
+        });
+      }
+    }
   }
-  return null;
+
+  return diagnostics;
+}
+
+function offsetRangeToLSPRange(
+  source: string,
+  startOffset: number,
+  endOffset: number
+): { start: { line: number; character: number }; end: { line: number; character: number } } {
+  let line = 0;
+  let character = 0;
+  let startLine = 0;
+  let startCharacter = 0;
+
+  for (let i = 0; i < endOffset && i < source.length; i++) {
+    if (i === startOffset) {
+      startLine = line;
+      startCharacter = character;
+    }
+    if (source[i] === '\n') {
+      line++;
+      character = 0;
+    } else {
+      character++;
+    }
+  }
+
+  return {
+    start: { line: startLine, character: startCharacter },
+    end: { line, character },
+  };
 }

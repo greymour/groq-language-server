@@ -537,16 +537,13 @@ export function inferTypeContextInFunctionBody(
 
   const paramVariable = findParameterVariable(node, functionDef);
   if (paramVariable) {
-    const inferredTypes = functionRegistry.getInferredParameterType(
-      functionDef.name,
-      paramVariable.index
-    );
+    const paramTypes = getParameterTypes(functionDef, paramVariable.index, functionRegistry);
 
-    if (inferredTypes.length > 0) {
-      const firstType = schemaLoader.getType(inferredTypes[0]);
+    if (paramTypes.length > 0) {
+      const firstType = schemaLoader.getType(paramTypes[0]);
       if (firstType) {
         context.type = firstType;
-        context.documentTypes = inferredTypes;
+        context.documentTypes = paramTypes;
         return finalizeContextInFunctionBody(context, node, schemaLoader);
       }
     }
@@ -558,16 +555,13 @@ export function inferTypeContextInFunctionBody(
     if (baseNode?.type === 'variable') {
       const paramMatch = findParameterByName(baseNode.text, functionDef);
       if (paramMatch !== null) {
-        const inferredTypes = functionRegistry.getInferredParameterType(
-          functionDef.name,
-          paramMatch
-        );
+        const paramTypes = getParameterTypes(functionDef, paramMatch, functionRegistry);
 
-        if (inferredTypes.length > 0) {
-          const firstType = schemaLoader.getType(inferredTypes[0]);
+        if (paramTypes.length > 0) {
+          const firstType = schemaLoader.getType(paramTypes[0]);
           if (firstType) {
             context.type = firstType;
-            context.documentTypes = inferredTypes;
+            context.documentTypes = paramTypes;
             return finalizeContextInFunctionBody(context, node, schemaLoader);
           }
         }
@@ -585,7 +579,8 @@ function findParameterContextInFunctionBody(
   schemaLoader: SchemaLoader
 ): InferredContext | null {
   // Look for projection ancestor, then find the base expression
-  const projection = findAncestorOfType(node, ['projection']);
+  // Note: if node IS the projection, use it; otherwise look for ancestor
+  const projection = node.type === 'projection' ? node : findAncestorOfType(node, ['projection']);
   if (!projection || !projection.parent) return null;
 
   const projExpr = projection.parent;
@@ -600,19 +595,16 @@ function findParameterContextInFunctionBody(
     if (subscriptBase?.type === 'variable') {
       const paramIndex = findParameterByName(subscriptBase.text, functionDef);
       if (paramIndex !== null) {
-        const inferredTypes = functionRegistry.getInferredParameterType(
-          functionDef.name,
-          paramIndex
-        );
+        const paramTypes = getParameterTypes(functionDef, paramIndex, functionRegistry);
 
-        if (inferredTypes.length > 0) {
-          const firstType = schemaLoader.getType(inferredTypes[0]);
+        if (paramTypes.length > 0) {
+          const firstType = schemaLoader.getType(paramTypes[0]);
           if (firstType) {
             return {
               type: firstType,
               field: null,
               isArray: true,
-              documentTypes: inferredTypes,
+              documentTypes: paramTypes,
             };
           }
         }
@@ -626,19 +618,16 @@ function findParameterContextInFunctionBody(
     if (derefBase?.type === 'variable') {
       const paramIndex = findParameterByName(derefBase.text, functionDef);
       if (paramIndex !== null) {
-        const inferredTypes = functionRegistry.getInferredParameterType(
-          functionDef.name,
-          paramIndex
-        );
+        const paramTypes = getParameterTypes(functionDef, paramIndex, functionRegistry);
 
-        if (inferredTypes.length > 0) {
-          const firstType = schemaLoader.getType(inferredTypes[0]);
+        if (paramTypes.length > 0) {
+          const firstType = schemaLoader.getType(paramTypes[0]);
           if (firstType) {
             return {
               type: firstType,
               field: null,
               isArray: false,
-              documentTypes: inferredTypes,
+              documentTypes: paramTypes,
             };
           }
         }
@@ -650,19 +639,16 @@ function findParameterContextInFunctionBody(
   if (baseNode.type === 'variable') {
     const paramIndex = findParameterByName(baseNode.text, functionDef);
     if (paramIndex !== null) {
-      const inferredTypes = functionRegistry.getInferredParameterType(
-        functionDef.name,
-        paramIndex
-      );
+      const paramTypes = getParameterTypes(functionDef, paramIndex, functionRegistry);
 
-      if (inferredTypes.length > 0) {
-        const firstType = schemaLoader.getType(inferredTypes[0]);
+      if (paramTypes.length > 0) {
+        const firstType = schemaLoader.getType(paramTypes[0]);
         if (firstType) {
           return {
             type: firstType,
             field: null,
             isArray: false,
-            documentTypes: inferredTypes,
+            documentTypes: paramTypes,
           };
         }
       }
@@ -715,6 +701,23 @@ function findParameterByName(name: string, functionDef: FunctionDefinition): num
     }
   }
   return null;
+}
+
+function getParameterTypes(
+  functionDef: FunctionDefinition,
+  paramIndex: number,
+  functionRegistry: FunctionRegistry
+): string[] {
+  const param = functionDef.parameters[paramIndex];
+  if (!param) return [];
+
+  // Priority 1: Use declared type from inline annotation
+  if (param.declaredType) {
+    return [param.declaredType];
+  }
+
+  // Priority 2: Fall back to inferred types from call sites
+  return functionRegistry.getInferredParameterType(functionDef.name, paramIndex);
 }
 
 function finalizeContextInFunctionBody(

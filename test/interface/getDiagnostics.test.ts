@@ -44,7 +44,7 @@ describe('getDiagnostics', () => {
   });
 });
 
-describe('typeHint validation', () => {
+describe('param type annotation validation', () => {
   const parser = new GroqParser();
   const schemaLoader = new SchemaLoader();
 
@@ -53,50 +53,53 @@ describe('typeHint validation', () => {
     await schemaLoader.loadFromPath(schemaPath);
   });
 
-  it('returns warning for unknown type in typeHint', () => {
-    const result = parser.parse('{ title }');
+  it('returns warning for unknown type in @param annotation', () => {
+    const source = `// @param {nonExistentType} $ref
+fn getStuff($ref) = $ref[] { title }`;
+    const result = parser.parse(source);
     const diagnostics = getDiagnostics(result, {
       schemaLoader,
-      source: '{ title }',
-      typeHint: 'nonExistentType',
+      source,
     });
 
-    const typeHintWarning = diagnostics.find(d =>
+    const typeWarning = diagnostics.find(d =>
       d.message.includes('not found in schema')
     );
-    expect(typeHintWarning).toBeDefined();
-    expect(typeHintWarning?.severity).toBe(2); // Warning
-    expect(typeHintWarning?.message).toContain('nonExistentType');
-    expect(typeHintWarning?.message).toContain('Available types');
+    expect(typeWarning).toBeDefined();
+    expect(typeWarning?.severity).toBe(2); // Warning
+    expect(typeWarning?.message).toContain('nonExistentType');
+    expect(typeWarning?.message).toContain('Available types');
   });
 
-  it('returns no warning for valid type in typeHint', () => {
-    const result = parser.parse('{ title }');
+  it('returns no warning for valid type in @param annotation', () => {
+    const source = `// @param {post} $ref
+fn getStuff($ref) = $ref[] { title }`;
+    const result = parser.parse(source);
     const diagnostics = getDiagnostics(result, {
       schemaLoader,
-      source: '{ title }',
-      typeHint: 'post',
+      source,
     });
 
-    const typeHintWarning = diagnostics.find(d =>
+    const typeWarning = diagnostics.find(d =>
       d.message.includes('not found in schema')
     );
-    expect(typeHintWarning).toBeUndefined();
+    expect(typeWarning).toBeUndefined();
   });
 
   it('includes available types in warning message', () => {
-    const result = parser.parse('{ title }');
+    const source = `// @param {invalidType} $ref
+fn getStuff($ref) = $ref[] { title }`;
+    const result = parser.parse(source);
     const diagnostics = getDiagnostics(result, {
       schemaLoader,
-      source: '{ title }',
-      typeHint: 'invalidType',
+      source,
     });
 
-    const typeHintWarning = diagnostics.find(d =>
+    const typeWarning = diagnostics.find(d =>
       d.message.includes('not found in schema')
     );
-    expect(typeHintWarning?.message).toContain('post');
-    expect(typeHintWarning?.message).toContain('author');
-    expect(typeHintWarning?.message).toContain('category');
+    expect(typeWarning?.message).toContain('post');
+    expect(typeWarning?.message).toContain('author');
+    expect(typeWarning?.message).toContain('category');
   });
 });

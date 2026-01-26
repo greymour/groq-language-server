@@ -6,6 +6,8 @@ import { inferTypeContext } from './TypeInference.js';
 export interface FunctionParameter {
   name: string;
   inferredTypes: Set<string>;
+  declaredType: string | null;
+  typeAnnotationRange: { startIndex: number; endIndex: number } | null;
 }
 
 export interface FunctionDefinition {
@@ -25,6 +27,7 @@ export class FunctionRegistry {
   private definitions: Map<string, FunctionDefinition> = new Map();
   private callSites: Map<string, CallSiteInfo[]> = new Map();
   private visitedFunctions: Set<string> = new Set();
+  private rawSource: string = '';
 
   clear(): void {
     this.definitions.clear();
@@ -32,11 +35,72 @@ export class FunctionRegistry {
     this.visitedFunctions.clear();
   }
 
-  extractFromAST(root: SyntaxNode, schemaLoader?: SchemaLoader): void {
+  extractFromAST(root: SyntaxNode, schemaLoader?: SchemaLoader, rawSource?: string): void {
     this.clear();
+    this.rawSource = rawSource ?? '';
     this.extractFunctionDefinitions(root);
     this.extractCallSites(root, schemaLoader);
     this.propagateTypes();
+  }
+
+  private extractParamTypeAnnotations(funcStartIndex: number): Map<string, { type: string; range: { startIndex: number; endIndex: number } }> {
+    const annotations = new Map<string, { type: string; range: { startIndex: number; endIndex: number } }>();
+    if (!this.rawSource) return annotations;
+
+    // Look at content before the function definition
+    const beforeFunc = this.rawSource.slice(0, funcStartIndex);
+
+    // Find all @param annotations in the comment block immediately before the function
+    // Pattern: // @param {typeName} $paramName
+    const regex = /\/\/\s*@param\s*\{([_A-Za-z][_0-9A-Za-z]*)\}\s*(\$[_A-Za-z][_0-9A-Za-z]*)/g;
+
+    // Only look at the last contiguous block of // comments before the function
+    const lines = beforeFunc.split('\n');
+    let commentBlockStart = -1;
+
+    // Find the start of the comment block immediately before function
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith('//')) {
+        commentBlockStart = i;
+      } else if (trimmed === '') {
+        // Empty line - continue looking
+        continue;
+      } else {
+        // Non-comment, non-empty line - stop
+        break;
+      }
+    }
+
+    if (commentBlockStart === -1) return annotations;
+
+    // Calculate the character offset where the comment block starts
+    let blockStartOffset = 0;
+    for (let i = 0; i < commentBlockStart; i++) {
+      blockStartOffset += lines[i].length + 1; // +1 for newline
+    }
+
+    const commentBlock = lines.slice(commentBlockStart).join('\n');
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(commentBlock)) !== null) {
+      const typeName = match[1];
+      const paramName = match[2];
+
+      // Calculate the range of the type name within the source
+      const typeStartInBlock = match.index + match[0].indexOf('{') + 1;
+      const typeEndInBlock = typeStartInBlock + typeName.length;
+
+      annotations.set(paramName, {
+        type: typeName,
+        range: {
+          startIndex: blockStartOffset + typeStartInBlock,
+          endIndex: blockStartOffset + typeEndInBlock,
+        },
+      });
+    }
+
+    return annotations;
   }
 
   private extractFunctionDefinitions(root: SyntaxNode): void {
@@ -52,14 +116,20 @@ export class FunctionRegistry {
 
       if (!bodyNode) return;
 
+      // Extract @param type annotations from comments before this function
+      const typeAnnotations = this.extractParamTypeAnnotations(node.startIndex);
+
       const parameters: FunctionParameter[] = [];
       if (paramListNode) {
         for (let i = 0; i < paramListNode.childCount; i++) {
           const child = paramListNode.child(i);
           if (child?.type === 'variable') {
+            const annotation = typeAnnotations.get(child.text);
             parameters.push({
               name: child.text,
               inferredTypes: new Set(),
+              declaredType: annotation?.type ?? null,
+              typeAnnotationRange: annotation?.range ?? null,
             });
           }
         }

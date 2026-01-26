@@ -80,35 +80,6 @@ storiesContent[] {
     expect(tags[0].content).toContain('storiesContent[]');
   });
 
-  describe('@type annotations', () => {
-    it('extracts @type annotation from /* groq */ /* @type */ pattern', () => {
-      const source = `const query = /* groq */ /* @type post */ \`{ title }\`;`;
-      const tags = findGroqTags(source);
-      expect(tags).toHaveLength(1);
-      expect(tags[0].typeHint).toBe('post');
-    });
-
-    it('extracts @type annotation before groq tag', () => {
-      const source = `/* @type author */ groq\`{ name }\``;
-      const tags = findGroqTags(source);
-      expect(tags).toHaveLength(1);
-      expect(tags[0].typeHint).toBe('author');
-    });
-
-    it('returns null typeHint when no @type annotation present', () => {
-      const source = `const query = groq\`*[_type == "post"]\`;`;
-      const tags = findGroqTags(source);
-      expect(tags).toHaveLength(1);
-      expect(tags[0].typeHint).toBeNull();
-    });
-
-    it('extracts @type with underscores and numbers', () => {
-      const source = `/* groq */ /* @type my_type_2 */ \`{ field }\``;
-      const tags = findGroqTags(source);
-      expect(tags).toHaveLength(1);
-      expect(tags[0].typeHint).toBe('my_type_2');
-    });
-  });
 });
 
 describe('isInsideGroqTag', () => {

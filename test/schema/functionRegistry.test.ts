@@ -190,6 +190,80 @@ describe('FunctionRegistry', () => {
       expect(registry.getAllDefinitions()).toHaveLength(0);
     });
   });
+
+  describe('param type annotations', () => {
+    it('extracts @param type annotation from comment before function', () => {
+      const source = `// @param {author} $ref
+fn getAuthor($ref) = $ref-> { name }`;
+      const result = parser.parse(source);
+      const registry = new FunctionRegistry();
+      registry.extractFromAST(result.tree.rootNode, undefined, source);
+
+      const def = registry.getDefinition('getAuthor');
+      expect(def).toBeDefined();
+      expect(def?.parameters[0].declaredType).toBe('author');
+    });
+
+    it('extracts multiple @param annotations', () => {
+      const source = `// @param {block} $items
+// @param {settings} $config
+fn process($items, $config) = $items[]`;
+      const result = parser.parse(source);
+      const registry = new FunctionRegistry();
+      registry.extractFromAST(result.tree.rootNode, undefined, source);
+
+      const def = registry.getDefinition('process');
+      expect(def).toBeDefined();
+      expect(def?.parameters[0].declaredType).toBe('block');
+      expect(def?.parameters[1].declaredType).toBe('settings');
+    });
+
+    it('returns null declaredType when no annotation present', () => {
+      const source = 'fn getStuff($ref) = $ref[]';
+      const result = parser.parse(source);
+      const registry = new FunctionRegistry();
+      registry.extractFromAST(result.tree.rootNode, undefined, source);
+
+      const def = registry.getDefinition('getStuff');
+      expect(def).toBeDefined();
+      expect(def?.parameters[0].declaredType).toBeNull();
+    });
+
+    it('extracts type annotation with underscores and numbers', () => {
+      const source = `// @param {my_type_2} $ref
+fn getStuff($ref) = $ref[]`;
+      const result = parser.parse(source);
+      const registry = new FunctionRegistry();
+      registry.extractFromAST(result.tree.rootNode, undefined, source);
+
+      const def = registry.getDefinition('getStuff');
+      expect(def?.parameters[0].declaredType).toBe('my_type_2');
+    });
+
+    it('stores type annotation range', () => {
+      const source = `// @param {author} $ref
+fn getAuthor($ref) = $ref-> { name }`;
+      const result = parser.parse(source);
+      const registry = new FunctionRegistry();
+      registry.extractFromAST(result.tree.rootNode, undefined, source);
+
+      const def = registry.getDefinition('getAuthor');
+      expect(def?.parameters[0].typeAnnotationRange).toBeDefined();
+      expect(def?.parameters[0].typeAnnotationRange?.startIndex).toBeGreaterThan(0);
+    });
+
+    it('handles empty lines between comment and function', () => {
+      const source = `// @param {author} $ref
+
+fn getAuthor($ref) = $ref-> { name }`;
+      const result = parser.parse(source);
+      const registry = new FunctionRegistry();
+      registry.extractFromAST(result.tree.rootNode, undefined, source);
+
+      const def = registry.getDefinition('getAuthor');
+      expect(def?.parameters[0].declaredType).toBe('author');
+    });
+  });
 });
 
 describe('FunctionRegistry with schema', () => {

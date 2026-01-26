@@ -280,6 +280,31 @@ brex::`;
       // Should have schema fields from post type (filtered by 't' prefix)
       expect(completions.some(c => c.label === 'title')).toBe(true);
     });
+
+    it('uses declared @param type for field completions', () => {
+      const query = `// @param {author} $ref
+fn getAuthor($ref) = $ref-> {  };`;
+      const result = parser.parse(query);
+
+      // Position inside the projection braces after the space
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 1, character: 29 },
+        schemaLoader
+      );
+
+      // Should have schema fields from declared type (author)
+      expect(completions.some(c => c.label === 'name')).toBe(true);
+      expect(completions.some(c => c.label === 'bio')).toBe(true);
+      expect(completions.some(c => c.label === 'email')).toBe(true);
+
+      // Should NOT have fields from other types (post, category)
+      // These are fields unique to post/category, not on author
+      expect(completions.some(c => c.label === 'slug')).toBe(false);        // post only
+      expect(completions.some(c => c.label === 'publishedAt')).toBe(false); // post only
+      expect(completions.some(c => c.label === 'categories')).toBe(false);  // post only
+    });
   });
 
   describe('complex scenarios', () => {

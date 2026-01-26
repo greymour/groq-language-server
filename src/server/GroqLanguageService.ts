@@ -176,7 +176,6 @@ export class GroqLanguageService {
       const diagnostics = getDiagnostics(query.parseResult, {
         schemaLoader: this.schemaLoader,
         source: query.content,
-        typeHint: query.typeHint,
       });
       for (const diag of diagnostics) {
         // Skip diagnostics that overlap with interpolation replacement positions
@@ -240,8 +239,7 @@ export class GroqLanguageService {
       query.content,
       query.parseResult.tree.rootNode,
       embeddedPosition,
-      this.schemaLoader,
-      { typeHint: query.typeHint }
+      this.schemaLoader
     );
   }
 
