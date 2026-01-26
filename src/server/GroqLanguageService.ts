@@ -16,10 +16,16 @@ import { getDefinition } from '../interface/getDefinition.js';
 import type { EmbeddedQuery, InterpolationRange } from '../embedded/findGroqTags.js';
 import { findGroqTags } from '../embedded/findGroqTags.js';
 import { SchemaLoader } from '../schema/SchemaLoader.js';
+import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../extensions/index.js';
+
+export interface ExtensionsConfig {
+  paramTypeAnnotations?: boolean;
+}
 
 export interface GroqLanguageServiceConfig {
   schemaEnabled?: boolean;
   schemaPath?: string;
+  extensions?: ExtensionsConfig;
 }
 
 export class GroqLanguageService {
@@ -27,15 +33,29 @@ export class GroqLanguageService {
   private embeddedQueryCache: Map<string, EmbeddedQuery[]> = new Map();
   private config: GroqLanguageServiceConfig;
   private schemaLoader: SchemaLoader;
+  private extensionRegistry: ExtensionRegistry;
 
   constructor(config: GroqLanguageServiceConfig = {}) {
     this.documentCache = new DocumentCache();
     this.config = config;
     this.schemaLoader = new SchemaLoader();
+    this.extensionRegistry = this.createExtensionRegistry(config.extensions);
 
     if (config.schemaPath) {
       this.loadSchema(config.schemaPath);
     }
+  }
+
+  private createExtensionRegistry(extensionsConfig?: ExtensionsConfig): ExtensionRegistry {
+    const registry = new ExtensionRegistry();
+
+    registry.register(paramTypeAnnotationsExtension);
+
+    if (extensionsConfig?.paramTypeAnnotations) {
+      registry.enable('paramTypeAnnotations');
+    }
+
+    return registry;
   }
 
   private async loadSchema(schemaPath: string): Promise<void> {
@@ -68,9 +88,17 @@ export class GroqLanguageService {
     const parseResult = this.documentCache.getParseResult(document.uri);
     if (!parseResult) {
       const result = this.documentCache.set(document);
-      return getDiagnostics(result, { schemaLoader: this.schemaLoader, source });
+      return getDiagnostics(result, {
+        schemaLoader: this.schemaLoader,
+        source,
+        extensionRegistry: this.extensionRegistry,
+      });
     }
-    return getDiagnostics(parseResult, { schemaLoader: this.schemaLoader, source });
+    return getDiagnostics(parseResult, {
+      schemaLoader: this.schemaLoader,
+      source,
+      extensionRegistry: this.extensionRegistry,
+    });
   }
 
   getCompletions(document: TextDocument, position: Position): CompletionItem[] {
@@ -81,9 +109,21 @@ export class GroqLanguageService {
     const parseResult = this.documentCache.getParseResult(document.uri);
     if (!parseResult) {
       const result = this.documentCache.set(document);
-      return getAutocompleteSuggestions(document.getText(), result.tree.rootNode, position, this.schemaLoader);
+      return getAutocompleteSuggestions(
+        document.getText(),
+        result.tree.rootNode,
+        position,
+        this.schemaLoader,
+        this.extensionRegistry
+      );
     }
-    return getAutocompleteSuggestions(document.getText(), parseResult.tree.rootNode, position, this.schemaLoader);
+    return getAutocompleteSuggestions(
+      document.getText(),
+      parseResult.tree.rootNode,
+      position,
+      this.schemaLoader,
+      this.extensionRegistry
+    );
   }
 
   getHover(document: TextDocument, position: Position): Hover | null {
@@ -176,6 +216,7 @@ export class GroqLanguageService {
       const diagnostics = getDiagnostics(query.parseResult, {
         schemaLoader: this.schemaLoader,
         source: query.content,
+        extensionRegistry: this.extensionRegistry,
       });
       for (const diag of diagnostics) {
         // Skip diagnostics that overlap with interpolation replacement positions
@@ -239,7 +280,8 @@ export class GroqLanguageService {
       query.content,
       query.parseResult.tree.rootNode,
       embeddedPosition,
-      this.schemaLoader
+      this.schemaLoader,
+      this.extensionRegistry
     );
   }
 
@@ -304,5 +346,13 @@ export class GroqLanguageService {
     if (config.schemaPath && config.schemaPath !== oldSchemaPath) {
       this.loadSchema(config.schemaPath);
     }
+
+    if (config.extensions !== undefined) {
+      this.extensionRegistry = this.createExtensionRegistry(config.extensions);
+    }
+  }
+
+  getExtensionRegistry(): ExtensionRegistry {
+    return this.extensionRegistry;
   }
 }

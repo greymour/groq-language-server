@@ -61,6 +61,11 @@
           "default": "",
           "description": "Path to the Sanity schema JSON file for schema-aware completions"
         },
+        "groq.extensions.paramTypeAnnotations": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable @param {type} $name syntax for typing function parameters. When enabled, provides type-aware completions inside function bodies and warns about unknown types."
+        },
         "groq.trace.server": {
           "type": "string",
           "enum": [

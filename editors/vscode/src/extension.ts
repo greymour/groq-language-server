@@ -42,8 +42,10 @@ export function activate(context: ExtensionContext) {
 
   const config = workspace.getConfiguration('groq');
   const schemaPath = config.get<string>('schemaPath');
+  const paramTypeAnnotations = config.get<boolean>('extensions.paramTypeAnnotations');
 
   outputChannel.appendLine(`Schema path from config: ${schemaPath}`);
+  outputChannel.appendLine(`Extensions - paramTypeAnnotations: ${paramTypeAnnotations}`);
 
   // Resolve schema path relative to workspace
   let resolvedSchemaPath: string | undefined;
@@ -66,6 +68,9 @@ export function activate(context: ExtensionContext) {
     },
     initializationOptions: {
       schemaPath: resolvedSchemaPath,
+      extensions: {
+        paramTypeAnnotations: paramTypeAnnotations ?? false,
+      },
     },
     outputChannel,
   };

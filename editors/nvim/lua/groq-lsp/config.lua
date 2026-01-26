@@ -9,8 +9,14 @@ M.defaults = {
       schema = {
         enabled = true,
       },
+      extensions = {
+        -- Enable @param {type} $name syntax for typing function parameters
+        paramTypeAnnotations = false,
+      },
     },
   },
+  -- Schema path relative to workspace root (optional)
+  schema_path = nil,
   auto_start = true,
 }
 

@@ -708,16 +708,7 @@ function getParameterTypes(
   paramIndex: number,
   functionRegistry: FunctionRegistry
 ): string[] {
-  const param = functionDef.parameters[paramIndex];
-  if (!param) return [];
-
-  // Priority 1: Use declared type from inline annotation
-  if (param.declaredType) {
-    return [param.declaredType];
-  }
-
-  // Priority 2: Fall back to inferred types from call sites
-  return functionRegistry.getInferredParameterType(functionDef.name, paramIndex);
+  return functionRegistry.getParameterType(functionDef.name, paramIndex);
 }
 
 function finalizeContextInFunctionBody(

@@ -2,6 +2,7 @@ import type { SyntaxNode } from '../parser/ASTTypes.js';
 import { walkTree, getFieldNode, findAncestorOfType } from '../parser/nodeUtils.js';
 import type { SchemaLoader } from './SchemaLoader.js';
 import { inferTypeContext } from './TypeInference.js';
+import type { ExtensionRegistry } from '../extensions/index.js';
 
 export interface FunctionParameter {
   name: string;
@@ -28,6 +29,7 @@ export class FunctionRegistry {
   private callSites: Map<string, CallSiteInfo[]> = new Map();
   private visitedFunctions: Set<string> = new Set();
   private rawSource: string = '';
+  private extensionRegistry: ExtensionRegistry | null = null;
 
   clear(): void {
     this.definitions.clear();
@@ -35,72 +37,18 @@ export class FunctionRegistry {
     this.visitedFunctions.clear();
   }
 
-  extractFromAST(root: SyntaxNode, schemaLoader?: SchemaLoader, rawSource?: string): void {
+  extractFromAST(
+    root: SyntaxNode,
+    schemaLoader?: SchemaLoader,
+    rawSource?: string,
+    extensionRegistry?: ExtensionRegistry
+  ): void {
     this.clear();
     this.rawSource = rawSource ?? '';
+    this.extensionRegistry = extensionRegistry ?? null;
     this.extractFunctionDefinitions(root);
     this.extractCallSites(root, schemaLoader);
     this.propagateTypes();
-  }
-
-  private extractParamTypeAnnotations(funcStartIndex: number): Map<string, { type: string; range: { startIndex: number; endIndex: number } }> {
-    const annotations = new Map<string, { type: string; range: { startIndex: number; endIndex: number } }>();
-    if (!this.rawSource) return annotations;
-
-    // Look at content before the function definition
-    const beforeFunc = this.rawSource.slice(0, funcStartIndex);
-
-    // Find all @param annotations in the comment block immediately before the function
-    // Pattern: // @param {typeName} $paramName
-    const regex = /\/\/\s*@param\s*\{([_A-Za-z][_0-9A-Za-z]*)\}\s*(\$[_A-Za-z][_0-9A-Za-z]*)/g;
-
-    // Only look at the last contiguous block of // comments before the function
-    const lines = beforeFunc.split('\n');
-    let commentBlockStart = -1;
-
-    // Find the start of the comment block immediately before function
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const trimmed = lines[i].trim();
-      if (trimmed.startsWith('//')) {
-        commentBlockStart = i;
-      } else if (trimmed === '') {
-        // Empty line - continue looking
-        continue;
-      } else {
-        // Non-comment, non-empty line - stop
-        break;
-      }
-    }
-
-    if (commentBlockStart === -1) return annotations;
-
-    // Calculate the character offset where the comment block starts
-    let blockStartOffset = 0;
-    for (let i = 0; i < commentBlockStart; i++) {
-      blockStartOffset += lines[i].length + 1; // +1 for newline
-    }
-
-    const commentBlock = lines.slice(commentBlockStart).join('\n');
-    let match: RegExpExecArray | null;
-
-    while ((match = regex.exec(commentBlock)) !== null) {
-      const typeName = match[1];
-      const paramName = match[2];
-
-      // Calculate the range of the type name within the source
-      const typeStartInBlock = match.index + match[0].indexOf('{') + 1;
-      const typeEndInBlock = typeStartInBlock + typeName.length;
-
-      annotations.set(paramName, {
-        type: typeName,
-        range: {
-          startIndex: blockStartOffset + typeStartInBlock,
-          endIndex: blockStartOffset + typeEndInBlock,
-        },
-      });
-    }
-
-    return annotations;
   }
 
   private extractFunctionDefinitions(root: SyntaxNode): void {
@@ -116,31 +64,37 @@ export class FunctionRegistry {
 
       if (!bodyNode) return;
 
-      // Extract @param type annotations from comments before this function
-      const typeAnnotations = this.extractParamTypeAnnotations(node.startIndex);
-
       const parameters: FunctionParameter[] = [];
       if (paramListNode) {
         for (let i = 0; i < paramListNode.childCount; i++) {
           const child = paramListNode.child(i);
           if (child?.type === 'variable') {
-            const annotation = typeAnnotations.get(child.text);
             parameters.push({
               name: child.text,
               inferredTypes: new Set(),
-              declaredType: annotation?.type ?? null,
-              typeAnnotationRange: annotation?.range ?? null,
+              declaredType: null,
+              typeAnnotationRange: null,
             });
           }
         }
       }
 
-      this.definitions.set(funcName, {
+      const funcDef: FunctionDefinition = {
         name: funcName,
         nameNode,
         parameters,
         bodyNode,
-      });
+      };
+
+      // Call extension hooks to augment the function definition
+      if (this.extensionRegistry) {
+        const hooks = this.extensionRegistry.getHook('onFunctionExtracted');
+        for (const { hook } of hooks) {
+          hook(funcDef, this.rawSource, node.startIndex);
+        }
+      }
+
+      this.definitions.set(funcName, funcDef);
     });
   }
 
@@ -283,6 +237,32 @@ export class FunctionRegistry {
     return Array.from(definition.parameters[paramIndex].inferredTypes);
   }
 
+  /**
+   * Get the type for a parameter, checking extensions first then falling back to inferred types.
+   */
+  getParameterType(funcName: string, paramIndex: number): string[] {
+    const definition = this.definitions.get(funcName);
+    if (!definition || paramIndex >= definition.parameters.length) {
+      return [];
+    }
+
+    const param = definition.parameters[paramIndex];
+
+    // Check extensions for declared type
+    if (this.extensionRegistry) {
+      const hooks = this.extensionRegistry.getHook('getParameterType');
+      for (const { hook } of hooks) {
+        const declaredType = hook(definition, param, paramIndex);
+        if (declaredType) {
+          return [declaredType];
+        }
+      }
+    }
+
+    // Fall back to inferred types
+    return Array.from(param.inferredTypes);
+  }
+
   getParameterByName(funcName: string, paramName: string): FunctionParameter | undefined {
     const definition = this.definitions.get(funcName);
     if (!definition) return undefined;
@@ -335,5 +315,9 @@ export class FunctionRegistry {
 
   getCallSites(funcName: string): CallSiteInfo[] {
     return this.callSites.get(funcName) ?? [];
+  }
+
+  getExtensionRegistry(): ExtensionRegistry | null {
+    return this.extensionRegistry;
   }
 }

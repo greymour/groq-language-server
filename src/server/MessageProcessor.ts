@@ -42,10 +42,16 @@ export class MessageProcessor {
     const initOptions = params.initializationOptions as {
       schemaPath?: string;
       schemaEnabled?: boolean;
+      extensions?: {
+        paramTypeAnnotations?: boolean;
+      };
     } | undefined;
 
-    if (initOptions?.schemaPath) {
-      this.service.updateConfig({ schemaPath: initOptions.schemaPath });
+    if (initOptions) {
+      this.service.updateConfig({
+        schemaPath: initOptions.schemaPath,
+        extensions: initOptions.extensions,
+      });
     }
 
     return {

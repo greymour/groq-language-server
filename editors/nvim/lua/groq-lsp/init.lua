@@ -16,11 +16,23 @@ local function start_client(bufnr)
     return nil
   end
 
+  local root_dir = get_root_dir(bufnr)
+
+  -- Resolve schema path relative to root_dir
+  local resolved_schema_path = nil
+  if opts.schema_path and root_dir then
+    resolved_schema_path = root_dir .. "/" .. opts.schema_path
+  end
+
   local client_id = vim.lsp.start({
     name = "groq_ls",
     cmd = opts.cmd,
-    root_dir = get_root_dir(bufnr),
+    root_dir = root_dir,
     settings = opts.settings,
+    init_options = {
+      schemaPath = resolved_schema_path,
+      extensions = opts.settings.groq.extensions,
+    },
   })
 
   return client_id

@@ -5,10 +5,18 @@ import { getAutocompleteSuggestions } from '../../src/interface/getAutocompleteS
 import { getHoverInformation } from '../../src/interface/getHoverInformation.js';
 import { getDefinition } from '../../src/interface/getDefinition.js';
 import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
+import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index.js';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function createExtensionRegistry(): ExtensionRegistry {
+  const registry = new ExtensionRegistry();
+  registry.register(paramTypeAnnotationsExtension);
+  registry.enable('paramTypeAnnotations');
+  return registry;
+}
 
 describe('Function Type Inference Integration', () => {
   const parser = new GroqParser();
@@ -291,7 +299,8 @@ fn getAuthor($ref) = $ref-> {  };`;
         query,
         result.tree.rootNode,
         { line: 1, character: 29 },
-        schemaLoader
+        schemaLoader,
+        createExtensionRegistry()
       );
 
       // Should have schema fields from declared type (author)

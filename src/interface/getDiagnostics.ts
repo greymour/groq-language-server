@@ -7,6 +7,7 @@ import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils.
 import type { SchemaLoader } from '../schema/SchemaLoader.js';
 import { inferTypeContext, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields } from '../schema/TypeInference.js';
 import { FunctionRegistry } from '../schema/FunctionRegistry.js';
+import type { ExtensionRegistry } from '../extensions/index.js';
 
 const PRIMITIVE_TYPES = new Set([
   'string',
@@ -36,6 +37,7 @@ function getBuiltInFieldType(fieldName: string): string | undefined {
 export interface DiagnosticsOptions {
   schemaLoader?: SchemaLoader;
   source?: string;
+  extensionRegistry?: ExtensionRegistry;
 }
 
 export function getDiagnostics(
@@ -55,19 +57,28 @@ export function getDiagnostics(
 
   // Always check for recursive function calls (doesn't require schema)
   const functionRegistry = new FunctionRegistry();
-  functionRegistry.extractFromAST(parseResult.tree.rootNode, options.schemaLoader, options.source);
+  functionRegistry.extractFromAST(
+    parseResult.tree.rootNode,
+    options.schemaLoader,
+    options.source,
+    options.extensionRegistry
+  );
 
   const recursionErrors = validateNoRecursion(parseResult.tree.rootNode, functionRegistry);
   diagnostics.push(...recursionErrors);
 
-  // Validate declared parameter types exist in schema
   if (options.schemaLoader?.isLoaded() && options.source) {
-    const paramTypeErrors = validateDeclaredParameterTypes(
-      functionRegistry,
-      options.schemaLoader,
-      options.source
-    );
-    diagnostics.push(...paramTypeErrors);
+    // Collect diagnostics from extensions (e.g., param type validation)
+    if (options.extensionRegistry) {
+      const hooks = options.extensionRegistry.getHook('getDiagnostics');
+      for (const { hook } of hooks) {
+        diagnostics.push(...hook({
+          functionDefinitions: functionRegistry.getAllDefinitions(),
+          schemaLoader: options.schemaLoader,
+          source: options.source,
+        }));
+      }
+    }
 
     const schemaErrors = validateFieldReferences(
       parseResult.tree.rootNode,
@@ -270,59 +281,3 @@ function validateNoRecursion(
   return diagnostics;
 }
 
-function validateDeclaredParameterTypes(
-  functionRegistry: FunctionRegistry,
-  schemaLoader: SchemaLoader,
-  source: string
-): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-
-  for (const funcDef of functionRegistry.getAllDefinitions()) {
-    for (const param of funcDef.parameters) {
-      if (param.declaredType && !schemaLoader.getType(param.declaredType)) {
-        const availableTypes = schemaLoader.getTypeNames();
-        const range = param.typeAnnotationRange
-          ? offsetRangeToLSPRange(source, param.typeAnnotationRange.startIndex, param.typeAnnotationRange.endIndex)
-          : { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
-
-        diagnostics.push({
-          severity: DiagnosticSeverity.Warning,
-          range,
-          message: `Type "${param.declaredType}" not found in schema. Available types: ${availableTypes.join(', ')}`,
-          source: 'groq',
-        });
-      }
-    }
-  }
-
-  return diagnostics;
-}
-
-function offsetRangeToLSPRange(
-  source: string,
-  startOffset: number,
-  endOffset: number
-): { start: { line: number; character: number }; end: { line: number; character: number } } {
-  let line = 0;
-  let character = 0;
-  let startLine = 0;
-  let startCharacter = 0;
-
-  for (let i = 0; i < endOffset && i < source.length; i++) {
-    if (i === startOffset) {
-      startLine = line;
-      startCharacter = character;
-    }
-    if (source[i] === '\n') {
-      line++;
-      character = 0;
-    } else {
-      character++;
-    }
-  }
-
-  return {
-    start: { line: startLine, character: startCharacter },
-    end: { line, character },
-  };
-}

@@ -2,8 +2,16 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { GroqParser } from '../../src/parser/GroqParser.js';
 import { FunctionRegistry } from '../../src/schema/FunctionRegistry.js';
 import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
+import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index.js';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+
+function createExtensionRegistry(): ExtensionRegistry {
+  const registry = new ExtensionRegistry();
+  registry.register(paramTypeAnnotationsExtension);
+  registry.enable('paramTypeAnnotations');
+  return registry;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -197,7 +205,7 @@ describe('FunctionRegistry', () => {
 fn getAuthor($ref) = $ref-> { name }`;
       const result = parser.parse(source);
       const registry = new FunctionRegistry();
-      registry.extractFromAST(result.tree.rootNode, undefined, source);
+      registry.extractFromAST(result.tree.rootNode, undefined, source, createExtensionRegistry());
 
       const def = registry.getDefinition('getAuthor');
       expect(def).toBeDefined();
@@ -210,7 +218,7 @@ fn getAuthor($ref) = $ref-> { name }`;
 fn process($items, $config) = $items[]`;
       const result = parser.parse(source);
       const registry = new FunctionRegistry();
-      registry.extractFromAST(result.tree.rootNode, undefined, source);
+      registry.extractFromAST(result.tree.rootNode, undefined, source, createExtensionRegistry());
 
       const def = registry.getDefinition('process');
       expect(def).toBeDefined();
@@ -222,7 +230,7 @@ fn process($items, $config) = $items[]`;
       const source = 'fn getStuff($ref) = $ref[]';
       const result = parser.parse(source);
       const registry = new FunctionRegistry();
-      registry.extractFromAST(result.tree.rootNode, undefined, source);
+      registry.extractFromAST(result.tree.rootNode, undefined, source, createExtensionRegistry());
 
       const def = registry.getDefinition('getStuff');
       expect(def).toBeDefined();
@@ -234,7 +242,7 @@ fn process($items, $config) = $items[]`;
 fn getStuff($ref) = $ref[]`;
       const result = parser.parse(source);
       const registry = new FunctionRegistry();
-      registry.extractFromAST(result.tree.rootNode, undefined, source);
+      registry.extractFromAST(result.tree.rootNode, undefined, source, createExtensionRegistry());
 
       const def = registry.getDefinition('getStuff');
       expect(def?.parameters[0].declaredType).toBe('my_type_2');
@@ -245,7 +253,7 @@ fn getStuff($ref) = $ref[]`;
 fn getAuthor($ref) = $ref-> { name }`;
       const result = parser.parse(source);
       const registry = new FunctionRegistry();
-      registry.extractFromAST(result.tree.rootNode, undefined, source);
+      registry.extractFromAST(result.tree.rootNode, undefined, source, createExtensionRegistry());
 
       const def = registry.getDefinition('getAuthor');
       expect(def?.parameters[0].typeAnnotationRange).toBeDefined();
@@ -258,7 +266,7 @@ fn getAuthor($ref) = $ref-> { name }`;
 fn getAuthor($ref) = $ref-> { name }`;
       const result = parser.parse(source);
       const registry = new FunctionRegistry();
-      registry.extractFromAST(result.tree.rootNode, undefined, source);
+      registry.extractFromAST(result.tree.rootNode, undefined, source, createExtensionRegistry());
 
       const def = registry.getDefinition('getAuthor');
       expect(def?.parameters[0].declaredType).toBe('author');

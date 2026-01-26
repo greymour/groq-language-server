@@ -2,10 +2,18 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { GroqParser } from '../../src/parser/GroqParser.js';
 import { getDiagnostics } from '../../src/interface/getDiagnostics.js';
 import { SchemaLoader } from '../../src/schema/SchemaLoader.js';
+import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index.js';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function createExtensionRegistry(): ExtensionRegistry {
+  const registry = new ExtensionRegistry();
+  registry.register(paramTypeAnnotationsExtension);
+  registry.enable('paramTypeAnnotations');
+  return registry;
+}
 
 describe('getDiagnostics', () => {
   const parser = new GroqParser();
@@ -60,6 +68,7 @@ fn getStuff($ref) = $ref[] { title }`;
     const diagnostics = getDiagnostics(result, {
       schemaLoader,
       source,
+      extensionRegistry: createExtensionRegistry(),
     });
 
     const typeWarning = diagnostics.find(d =>
@@ -78,6 +87,7 @@ fn getStuff($ref) = $ref[] { title }`;
     const diagnostics = getDiagnostics(result, {
       schemaLoader,
       source,
+      extensionRegistry: createExtensionRegistry(),
     });
 
     const typeWarning = diagnostics.find(d =>
@@ -93,6 +103,7 @@ fn getStuff($ref) = $ref[] { title }`;
     const diagnostics = getDiagnostics(result, {
       schemaLoader,
       source,
+      extensionRegistry: createExtensionRegistry(),
     });
 
     const typeWarning = diagnostics.find(d =>

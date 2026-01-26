@@ -18,6 +18,7 @@ import type { SchemaLoader } from '../schema/SchemaLoader.js';
 import { inferTypeContext, inferTypeContextFromText, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference.js';
 import type { ResolvedField } from '../schema/SchemaTypes.js';
 import { FunctionRegistry } from '../schema/FunctionRegistry.js';
+import type { ExtensionRegistry } from '../extensions/index.js';
 
 type CompletionContext =
   | 'empty'
@@ -35,11 +36,12 @@ export function getAutocompleteSuggestions(
   source: string,
   root: SyntaxNode,
   position: Position,
-  schemaLoader?: SchemaLoader
+  schemaLoader?: SchemaLoader,
+  extensionRegistry?: ExtensionRegistry
 ): CompletionItem[] {
   const context = determineCompletionContext(source, root, position);
   const functionRegistry = new FunctionRegistry();
-  functionRegistry.extractFromAST(root, schemaLoader, source);
+  functionRegistry.extractFromAST(root, schemaLoader, source, extensionRegistry);
   return getCompletionsForContext(context, source, root, position, schemaLoader, functionRegistry);
 }
 
