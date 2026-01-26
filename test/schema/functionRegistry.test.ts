@@ -34,14 +34,14 @@ describe('FunctionRegistry', () => {
     });
 
     it('extracts namespaced function definitions', () => {
-      const query = 'fn brex::helper($ref) = $ref[]';
+      const query = 'fn custom::helper($ref) = $ref[]';
       const result = parser.parse(query);
       const registry = new FunctionRegistry();
       registry.extractFromAST(result.tree.rootNode);
 
-      expect(registry.hasDefinition('brex::helper')).toBe(true);
-      const def = registry.getDefinition('brex::helper');
-      expect(def?.name).toBe('brex::helper');
+      expect(registry.hasDefinition('custom::helper')).toBe(true);
+      const def = registry.getDefinition('custom::helper');
+      expect(def?.name).toBe('custom::helper');
       expect(def?.parameters).toHaveLength(1);
     });
 

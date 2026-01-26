@@ -137,7 +137,7 @@ function validateFieldReferences(
       if (nameNode?.id === node.id) return;
     }
 
-    // Skip namespaced identifiers (custom function calls like brex::legalPageLinkTitles)
+    // Skip namespaced identifiers (custom function calls like custom::getLinkTitles)
     if (parent?.type === 'namespaced_identifier') return;
 
     // Only validate identifiers inside projections

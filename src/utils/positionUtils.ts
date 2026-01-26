@@ -105,7 +105,7 @@ export function getNamespacePrefixAtPosition(text: string, position: Position): 
   const lineText = getLineText(text, position.line);
   const before = lineText.slice(0, position.character);
 
-  // Match patterns like "brex::" or "geo::" at the end
+  // Match patterns like "custom::" or "geo::" at the end
   const namespaceMatch = before.match(/([_A-Za-z][_0-9A-Za-z]*)::([_A-Za-z][_0-9A-Za-z]*)?$/);
   if (namespaceMatch) {
     return namespaceMatch[1];

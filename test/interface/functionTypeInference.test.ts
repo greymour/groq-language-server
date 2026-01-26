@@ -30,14 +30,14 @@ describe('Function Type Inference Integration', () => {
   describe('diagnostics for custom functions', () => {
     it('does not report errors for custom function calls', () => {
       const query = `
-        fn brex::legalPageLinks($ref) = $ref[] { title };
-        *[_type == "post"] { "links": brex::legalPageLinks(content) }
+        fn custom::getLinks($ref) = $ref[] { title };
+        *[_type == "post"] { "links": custom::getLinks(content) }
       `;
       const result = parser.parse(query);
       const diagnostics = getDiagnostics(result, { schemaLoader, source: query });
 
       const functionNameErrors = diagnostics.filter(d =>
-        d.message.includes('brex') || d.message.includes('legalPageLinks')
+        d.message.includes('brex') || d.message.includes('getLinks')
       );
       expect(functionNameErrors).toHaveLength(0);
     });
@@ -71,7 +71,7 @@ describe('Function Type Inference Integration', () => {
   describe('autocomplete for custom functions', () => {
     it('suggests custom functions in general context', () => {
       const query = `
-        fn brex::helper($x) = $x[];
+        fn custom::helper($x) = $x[];
         `;
       const result = parser.parse(query);
       const completions = getAutocompleteSuggestions(
@@ -81,7 +81,7 @@ describe('Function Type Inference Integration', () => {
         schemaLoader
       );
 
-      expect(completions.some(c => c.label === 'brex::helper')).toBe(true);
+      expect(completions.some(c => c.label === 'custom::helper')).toBe(true);
     });
 
     it('suggests custom functions in projection', () => {
@@ -151,8 +151,8 @@ double(5)`;
     });
 
     it('shows hover for namespaced custom function', () => {
-      const query = `fn brex::helper($ref) = $ref[];
-brex::helper(content)`;
+      const query = `fn custom::helper($ref) = $ref[];
+custom::helper(content)`;
       const result = parser.parse(query);
       const hover = getHoverInformation(
         query,
@@ -163,7 +163,7 @@ brex::helper(content)`;
 
       expect(hover).not.toBeNull();
       const content = hover?.contents as { value: string };
-      expect(content.value).toContain('brex::helper');
+      expect(content.value).toContain('custom::helper');
     });
   });
 
@@ -201,18 +201,18 @@ myApp::helper(content)`;
 
   describe('namespace filtering', () => {
     it('filters completions to only show functions in typed namespace', () => {
-      const query = `fn brex::helper($x) = $x;
+      const query = `fn custom::helper($x) = $x;
 fn other::func($y) = $y;
-brex::`;
+custom::`;
       const result = parser.parse(query);
       const completions = getAutocompleteSuggestions(
         query,
         result.tree.rootNode,
-        { line: 2, character: 6 },
+        { line: 2, character: 8 },
         schemaLoader
       );
 
-      // Should only show brex:: functions
+      // Should only show custom:: functions
       expect(completions.some(c => c.label === 'helper')).toBe(true);
       // Should not show other namespace or non-namespaced functions
       expect(completions.some(c => c.label === 'other::func')).toBe(false);
@@ -319,12 +319,12 @@ fn getAuthor($ref) = $ref-> {  };`;
   describe('complex scenarios', () => {
     it('handles the example from the plan', () => {
       const query = `
-fn brex::legalPageLinkTitles($ref) = $ref[] {
+fn custom::getLinkTitles($ref) = $ref[] {
   "title": title
 };
 
 *[_type == "post"] {
-  "titles": brex::legalPageLinkTitles(content)
+  "titles": custom::getLinkTitles(content)
 }
       `;
       const result = parser.parse(query);
@@ -332,7 +332,7 @@ fn brex::legalPageLinkTitles($ref) = $ref[] {
 
       const diagnostics = getDiagnostics(result, { schemaLoader, source: query });
       const brexErrors = diagnostics.filter(d =>
-        d.message.includes('brex') || d.message.includes('legalPageLinkTitles')
+        d.message.includes('brex') || d.message.includes('getLinkTitles')
       );
       expect(brexErrors).toHaveLength(0);
     });
@@ -373,7 +373,7 @@ fn utils::add($a, $b) = $a + $b;
     });
 
     it('reports error for namespaced recursive function calls', () => {
-      const query = `fn brex::legalPageContent($ref) = $ref[] { "titles": brex::legalPageContent(@) }`;
+      const query = `fn custom::getContent($ref) = $ref[] { "titles": custom::getContent(@) }`;
       const result = parser.parse(query);
       const diagnostics = getDiagnostics(result, { schemaLoader, source: query });
 
@@ -384,19 +384,19 @@ fn utils::add($a, $b) = $a + $b;
     });
 
     it('does not show recursive function in autocomplete when inside its body', () => {
-      const query = `fn brex::legalPageContent($ref) = $ref[] { t };`;
+      const query = `fn custom::getContent($ref) = $ref[] { t };`;
       const result = parser.parse(query);
       // Position at 't' inside the function body
       const completions = getAutocompleteSuggestions(
         query,
         result.tree.rootNode,
-        { line: 0, character: 43 },
+        { line: 0, character: 39 },
         schemaLoader
       );
 
       // Should not suggest the function we're currently defining
-      expect(completions.some(c => c.label === 'brex::legalPageContent')).toBe(false);
-      expect(completions.some(c => c.label === 'legalPageContent')).toBe(false);
+      expect(completions.some(c => c.label === 'custom::getContent')).toBe(false);
+      expect(completions.some(c => c.label === 'getContent')).toBe(false);
     });
 
     it('allows calling other functions from within a function body', () => {
