@@ -102,11 +102,25 @@ require("groq-lsp").setup({
   -- Automatically start LSP when opening matching files
   auto_start = true,
 
+  -- Path to schema file (relative to project root)
+  schema_path = "schema.json",
+
   -- LSP settings
   settings = {
     groq = {
       schema = {
         enabled = true,
+      },
+      extensions = {
+        -- Enable @param {type} $name syntax for typing function parameters
+        paramTypeAnnotations = false,
+      },
+      schemaValidation = {
+        enabled = true,           -- Enable schema validation
+        maxDepth = 50,            -- Maximum nesting depth
+        maxTypes = 10000,         -- Maximum number of types
+        maxFieldsPerType = 1000,  -- Maximum fields per type
+        cacheValidation = true,   -- Cache validation results
       },
     },
   },
@@ -152,6 +166,12 @@ Add to your `settings.json`:
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `groq.schemaPath` | Path to Sanity schema JSON file for schema-aware completions | `""` |
+| `groq.extensions.paramTypeAnnotations` | Enable `@param {type} $name` syntax for typing function parameters | `false` |
+| `groq.schema.validation.enabled` | Enable schema validation before processing | `true` |
+| `groq.schema.validation.maxDepth` | Maximum nesting depth allowed in schema files | `50` |
+| `groq.schema.validation.maxTypes` | Maximum number of types allowed in a schema | `10000` |
+| `groq.schema.validation.maxFieldsPerType` | Maximum fields allowed per type | `1000` |
+| `groq.schema.validation.cacheValidation` | Cache validation results for faster startup | `true` |
 | `groq.trace.server` | Traces communication between VSCode and the language server (`off`, `messages`, `verbose`) | `"off"` |
 
 ## Supported File Types
@@ -161,6 +181,54 @@ Add to your `settings.json`:
   - Tagged template literals: `` groq`*[_type == "post"]` ``
   - With comment annotation: `` /* groq */ `*[_type == "post"]` ``
   - Using defineQuery: `` defineQuery(`*[_type == "post"]`) ``
+
+## Extensions and non-standard GROQ features
+This language server includes support for some features that are not part of the GROQ spec, which can be enabled on an opt-in basis.
+
+### Parameter Type Annotations
+
+When enabled via `extensions.paramTypeAnnotations`, you can annotate function parameters with schema types using JSDoc-style comments:
+
+```groq
+// @param {post} $doc
+// @param {author} $author
+fn getAuthorName($doc, $author) = $doc.author->name + " by " + $author.name
+```
+
+This provides:
+- Type-aware completions inside function bodies (e.g., `$doc.` suggests fields from the `post` type)
+- Diagnostics for unknown types referenced in annotations
+- Hover information showing the declared type
+
+## Schema Validation & Security
+
+The language server validates schema files before processing to protect against malformed or malicious schemas that could cause performance issues.
+
+### Validation Checks
+
+| Check | Description | Default Limit |
+|-------|-------------|---------------|
+| Depth limit | Prevents stack exhaustion from deeply nested objects | 50 levels |
+| Type count | Limits the number of types in a schema | 10,000 types |
+| Fields per type | Limits fields per type definition | 1,000 fields |
+| Structure validation | Ensures schema matches expected Sanity or GROQ type format | - |
+
+### Validation Cache
+
+To improve startup performance, validation results are cached in a `.{schema-name}.groq-cache` file alongside your schema. The cache is automatically invalidated when:
+
+- The schema file content changes (detected via SHA-256 hash)
+- The validation configuration changes (maxDepth, maxTypes, maxFieldsPerType)
+- The cache format version is incompatible
+
+You can disable caching by setting `schema.validation.cacheValidation` to `false`.
+
+### Disabling Validation
+
+If you need to load schemas that exceed the default limits, you can either:
+
+1. Increase the limits in your editor configuration
+2. Disable validation entirely by setting `schema.validation.enabled` to `false`
 
 ## Development
 
