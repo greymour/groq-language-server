@@ -39,13 +39,9 @@ case "$1" in
         ;;
 esac
 
-cd "$PROJECT_ROOT"
-
-echo "Building extension..."
-npm run build:vscode
-
-echo "Packaging extension..."
 cd "$PROJECT_ROOT/editors/vscode"
+
+echo "Building and packaging extension..."
 npm run package
 
 VSIX_FILE=$(ls -1 "$PROJECT_ROOT/editors/vscode"/groq-vscode-*.vsix 2>/dev/null | head -n 1)
