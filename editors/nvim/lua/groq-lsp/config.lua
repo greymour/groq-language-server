@@ -10,8 +10,13 @@ M.defaults = {
         enabled = true,
       },
       extensions = {
-        -- Enable @param {type} $name syntax for typing function parameters
         paramTypeAnnotations = false,
+      },
+      schemaValidation = {
+        enabled = true,
+        maxDepth = 50,
+        maxTypes = 10000,
+        maxFieldsPerType = 1000,
       },
     },
   },

@@ -16,7 +16,10 @@ import { getDefinition } from '../interface/getDefinition.js';
 import type { EmbeddedQuery, InterpolationRange } from '../embedded/findGroqTags.js';
 import { findGroqTags } from '../embedded/findGroqTags.js';
 import { SchemaLoader } from '../schema/SchemaLoader.js';
+import type { SchemaValidationConfig } from '../schema/SchemaLoader.js';
 import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../extensions/index.js';
+
+export type { SchemaValidationConfig };
 
 export interface ExtensionsConfig {
   paramTypeAnnotations?: boolean;
@@ -26,6 +29,7 @@ export interface GroqLanguageServiceConfig {
   schemaEnabled?: boolean;
   schemaPath?: string;
   extensions?: ExtensionsConfig;
+  schemaValidation?: SchemaValidationConfig;
 }
 
 export class GroqLanguageService {
@@ -38,7 +42,7 @@ export class GroqLanguageService {
   constructor(config: GroqLanguageServiceConfig = {}) {
     this.documentCache = new DocumentCache();
     this.config = config;
-    this.schemaLoader = new SchemaLoader();
+    this.schemaLoader = new SchemaLoader(config.schemaValidation);
     this.extensionRegistry = this.createExtensionRegistry(config.extensions);
 
     if (config.schemaPath) {
@@ -342,6 +346,10 @@ export class GroqLanguageService {
   updateConfig(config: Partial<GroqLanguageServiceConfig>): void {
     const oldSchemaPath = this.config.schemaPath;
     this.config = { ...this.config, ...config };
+
+    if (config.schemaValidation !== undefined) {
+      this.schemaLoader.updateValidationConfig(config.schemaValidation);
+    }
 
     if (config.schemaPath && config.schemaPath !== oldSchemaPath) {
       this.loadSchema(config.schemaPath);

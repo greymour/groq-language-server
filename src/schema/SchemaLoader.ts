@@ -3,6 +3,25 @@ import * as path from 'path';
 import type { SanitySchema, SchemaType, ResolvedType, ResolvedField } from './SchemaTypes.js';
 import { isDocumentType, isReferenceField, isArrayField, getReferenceTargets, getArrayItemTypes } from './SchemaTypes.js';
 
+export interface SchemaValidationConfig {
+  enabled?: boolean;
+  maxDepth?: number;
+  maxTypes?: number;
+  maxFieldsPerType?: number;
+}
+
+const DEFAULT_VALIDATION_CONFIG: Required<SchemaValidationConfig> = {
+  enabled: true,
+  maxDepth: 50,
+  maxTypes: 10000,
+  maxFieldsPerType: 1000,
+};
+
+interface SchemaValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
 interface GroqTypeSchema {
   name: string;
   type: string;
@@ -31,9 +50,28 @@ export class SchemaLoader {
   private rawSchema: unknown = null;
   private resolvedTypes: Map<string, ResolvedType> = new Map();
   private schemaPath: string | null = null;
+  private validationConfig: Required<SchemaValidationConfig>;
+  private lastValidationError: string | null = null;
+
+  constructor(validationConfig?: SchemaValidationConfig) {
+    this.validationConfig = { ...DEFAULT_VALIDATION_CONFIG, ...validationConfig };
+  }
+
+  updateValidationConfig(config: SchemaValidationConfig): void {
+    this.validationConfig = { ...this.validationConfig, ...config };
+  }
+
+  getValidationConfig(): Required<SchemaValidationConfig> {
+    return { ...this.validationConfig };
+  }
+
+  getLastValidationError(): string | null {
+    return this.lastValidationError;
+  }
 
   async loadFromPath(schemaPath: string): Promise<boolean> {
     try {
+      this.lastValidationError = null;
       const absolutePath = path.resolve(schemaPath);
       if (!fs.existsSync(absolutePath)) {
         return false;
@@ -41,6 +79,17 @@ export class SchemaLoader {
 
       const content = fs.readFileSync(absolutePath, 'utf-8');
       const parsed = JSON.parse(content);
+
+      if (this.validationConfig.enabled) {
+        const validation = this.validateSchema(parsed);
+        if (!validation.valid) {
+          this.lastValidationError = validation.error ?? 'Schema validation failed';
+          this.schema = null;
+          this.rawSchema = null;
+          this.resolvedTypes.clear();
+          return false;
+        }
+      }
 
       this.rawSchema = parsed;
       this.schemaPath = absolutePath;
@@ -209,6 +258,136 @@ export class SchemaLoader {
     };
   }
 
+  private validateSchema(parsed: unknown): SchemaValidationResult {
+    const depthResult = this.checkDepth(parsed, 0);
+    if (!depthResult.valid) {
+      return depthResult;
+    }
+
+    const structureResult = this.validateStructure(parsed);
+    if (!structureResult.valid) {
+      return structureResult;
+    }
+
+    return { valid: true };
+  }
+
+  private checkDepth(value: unknown, currentDepth: number): SchemaValidationResult {
+    if (currentDepth > this.validationConfig.maxDepth) {
+      return {
+        valid: false,
+        error: `Schema exceeds maximum nesting depth of ${this.validationConfig.maxDepth}`,
+      };
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const result = this.checkDepth(item, currentDepth + 1);
+        if (!result.valid) return result;
+      }
+    } else if (value !== null && typeof value === 'object') {
+      for (const key of Object.keys(value)) {
+        const result = this.checkDepth((value as Record<string, unknown>)[key], currentDepth + 1);
+        if (!result.valid) return result;
+      }
+    }
+
+    return { valid: true };
+  }
+
+  private validateStructure(parsed: unknown): SchemaValidationResult {
+    if (this.isGroqTypeSchema(parsed)) {
+      return this.validateGroqTypeSchemaStructure(parsed);
+    } else if (this.isSanitySchema(parsed)) {
+      return this.validateSanitySchemaStructure(parsed);
+    }
+
+    return {
+      valid: false,
+      error: 'Schema does not match expected Sanity or GROQ type schema format',
+    };
+  }
+
+  private validateGroqTypeSchemaStructure(
+    raw: GroqTypeSchema[] | Record<string, GroqTypeSchema>
+  ): SchemaValidationResult {
+    const types = Array.isArray(raw) ? raw : Object.values(raw);
+
+    if (types.length > this.validationConfig.maxTypes) {
+      return {
+        valid: false,
+        error: `Schema contains ${types.length} types, exceeding maximum of ${this.validationConfig.maxTypes}`,
+      };
+    }
+
+    for (const schemaType of types) {
+      if (typeof schemaType.name !== 'string' || schemaType.name.length === 0) {
+        return { valid: false, error: 'Schema type missing required "name" field' };
+      }
+      if (typeof schemaType.type !== 'string') {
+        return { valid: false, error: `Schema type "${schemaType.name}" missing required "type" field` };
+      }
+
+      const attributes = schemaType.attributes || schemaType.value?.attributes;
+      if (attributes) {
+        const fieldCount = Object.keys(attributes).length;
+        if (fieldCount > this.validationConfig.maxFieldsPerType) {
+          return {
+            valid: false,
+            error: `Type "${schemaType.name}" has ${fieldCount} fields, exceeding maximum of ${this.validationConfig.maxFieldsPerType}`,
+          };
+        }
+      }
+    }
+
+    return { valid: true };
+  }
+
+  private validateSanitySchemaStructure(schema: SanitySchema): SchemaValidationResult {
+    if (!Array.isArray(schema.types)) {
+      return { valid: false, error: 'Sanity schema "types" must be an array' };
+    }
+
+    if (schema.types.length > this.validationConfig.maxTypes) {
+      return {
+        valid: false,
+        error: `Schema contains ${schema.types.length} types, exceeding maximum of ${this.validationConfig.maxTypes}`,
+      };
+    }
+
+    for (const schemaType of schema.types) {
+      if (typeof schemaType.name !== 'string' || schemaType.name.length === 0) {
+        return { valid: false, error: 'Schema type missing required "name" field' };
+      }
+      if (typeof schemaType.type !== 'string') {
+        return { valid: false, error: `Schema type "${schemaType.name}" missing required "type" field` };
+      }
+
+      if (schemaType.fields) {
+        if (!Array.isArray(schemaType.fields)) {
+          return { valid: false, error: `Type "${schemaType.name}" has invalid "fields" (must be an array)` };
+        }
+        if (schemaType.fields.length > this.validationConfig.maxFieldsPerType) {
+          return {
+            valid: false,
+            error: `Type "${schemaType.name}" has ${schemaType.fields.length} fields, exceeding maximum of ${this.validationConfig.maxFieldsPerType}`,
+          };
+        }
+
+        for (const field of schemaType.fields) {
+          if (typeof field.name !== 'string' || field.name.length === 0) {
+            return { valid: false, error: `Field in type "${schemaType.name}" missing required "name"` };
+          }
+          if (typeof field.type !== 'string') {
+            return { valid: false, error: `Field "${field.name}" in type "${schemaType.name}" missing required "type"` };
+          }
+        }
+      }
+    }
+
+    return { valid: true };
+  }
+
   getType(typeName: string): ResolvedType | undefined {
     return this.resolvedTypes.get(typeName);
   }
@@ -251,8 +430,10 @@ export class SchemaLoader {
 
   clear(): void {
     this.schema = null;
+    this.rawSchema = null;
     this.resolvedTypes.clear();
     this.schemaPath = null;
+    this.lastValidationError = null;
   }
 }
 

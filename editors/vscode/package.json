@@ -66,6 +66,32 @@
           "default": false,
           "description": "Enable @param {type} $name syntax for typing function parameters. When enabled, provides type-aware completions inside function bodies and warns about unknown types."
         },
+        "groq.schema.validation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable validation of schema files before processing. Protects against malformed schemas that could cause performance issues."
+        },
+        "groq.schema.validation.maxDepth": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Maximum nesting depth allowed in schema files. Deeply nested schemas may cause stack exhaustion."
+        },
+        "groq.schema.validation.maxTypes": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 1,
+          "maximum": 100000,
+          "description": "Maximum number of types allowed in a schema file."
+        },
+        "groq.schema.validation.maxFieldsPerType": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Maximum number of fields allowed per type in a schema file."
+        },
         "groq.trace.server": {
           "type": "string",
           "enum": [

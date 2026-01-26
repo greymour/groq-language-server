@@ -45,12 +45,19 @@ export class MessageProcessor {
       extensions?: {
         paramTypeAnnotations?: boolean;
       };
+      schemaValidation?: {
+        enabled?: boolean;
+        maxDepth?: number;
+        maxTypes?: number;
+        maxFieldsPerType?: number;
+      };
     } | undefined;
 
     if (initOptions) {
       this.service.updateConfig({
         schemaPath: initOptions.schemaPath,
         extensions: initOptions.extensions,
+        schemaValidation: initOptions.schemaValidation,
       });
     }
 

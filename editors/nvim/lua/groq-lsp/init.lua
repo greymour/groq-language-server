@@ -32,6 +32,7 @@ local function start_client(bufnr)
     init_options = {
       schemaPath = resolved_schema_path,
       extensions = opts.settings.groq and opts.settings.groq.extensions or nil,
+      schemaValidation = opts.settings.groq and opts.settings.groq.schemaValidation or nil,
     },
   })
 
