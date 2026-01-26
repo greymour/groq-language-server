@@ -34,7 +34,7 @@ export const paramTypeAnnotationsExtension: Extension = {
       }
     },
 
-    getParameterType: (funcDef, param, _paramIndex) => {
+    getParameterType: (_funcDef, param, _paramIndex) => {
       return param.declaredType ?? null;
     },
 
