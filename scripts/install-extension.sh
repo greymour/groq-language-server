@@ -55,6 +55,9 @@ if [[ -z "$VSIX_FILE" ]]; then
     exit 1
 fi
 
+echo "Uninstalling existing extension (if any)..."
+"$EDITOR_CMD" --uninstall-extension sanity.groq-vscode 2>/dev/null || true
+
 echo "Installing $VSIX_FILE to $1..."
 "$EDITOR_CMD" --install-extension "$VSIX_FILE"
 
