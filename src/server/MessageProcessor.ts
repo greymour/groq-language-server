@@ -50,6 +50,7 @@ export class MessageProcessor {
         maxDepth?: number;
         maxTypes?: number;
         maxFieldsPerType?: number;
+        cacheValidation?: boolean;
       };
     } | undefined;
 

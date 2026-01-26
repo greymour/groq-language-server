@@ -92,6 +92,11 @@
           "maximum": 10000,
           "description": "Maximum number of fields allowed per type in a schema file."
         },
+        "groq.schema.validation.cacheValidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cache schema validation results to skip re-validation when the schema file hasn't changed. Improves startup performance."
+        },
         "groq.trace.server": {
           "type": "string",
           "enum": [

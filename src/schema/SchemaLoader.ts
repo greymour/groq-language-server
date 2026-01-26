@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import type { SanitySchema, SchemaType, ResolvedType, ResolvedField } from './SchemaTypes.js';
 import { isDocumentType, isReferenceField, isArrayField, getReferenceTargets, getArrayItemTypes } from './SchemaTypes.js';
 
@@ -8,6 +9,7 @@ export interface SchemaValidationConfig {
   maxDepth?: number;
   maxTypes?: number;
   maxFieldsPerType?: number;
+  cacheValidation?: boolean;
 }
 
 const DEFAULT_VALIDATION_CONFIG: Required<SchemaValidationConfig> = {
@@ -15,9 +17,20 @@ const DEFAULT_VALIDATION_CONFIG: Required<SchemaValidationConfig> = {
   maxDepth: 50,
   maxTypes: 10000,
   maxFieldsPerType: 1000,
+  cacheValidation: true,
 };
 
+const CACHE_VERSION = 1;
+
 interface SchemaValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+interface ValidationCacheEntry {
+  version: number;
+  schemaHash: string;
+  configHash: string;
   valid: boolean;
   error?: string;
 }
@@ -81,13 +94,37 @@ export class SchemaLoader {
       const parsed = JSON.parse(content);
 
       if (this.validationConfig.enabled) {
-        const validation = this.validateSchema(parsed);
-        if (!validation.valid) {
-          this.lastValidationError = validation.error ?? 'Schema validation failed';
-          this.schema = null;
-          this.rawSchema = null;
-          this.resolvedTypes.clear();
-          return false;
+        const schemaHash = this.computeHash(content);
+        const configHash = this.computeConfigHash();
+        const cachePath = this.getCachePath(absolutePath);
+
+        const cachedResult = this.validationConfig.cacheValidation
+          ? this.readValidationCache(cachePath, schemaHash, configHash)
+          : null;
+
+        if (cachedResult) {
+          if (!cachedResult.valid) {
+            const errorMsg = cachedResult.error ?? 'Schema validation failed';
+            this.lastValidationError = `${errorMsg} (cached)`;
+            this.schema = null;
+            this.rawSchema = null;
+            this.resolvedTypes.clear();
+            return false;
+          }
+        } else {
+          const validation = this.validateSchema(parsed);
+
+          if (this.validationConfig.cacheValidation) {
+            this.writeValidationCache(cachePath, schemaHash, configHash, validation);
+          }
+
+          if (!validation.valid) {
+            this.lastValidationError = validation.error ?? 'Schema validation failed';
+            this.schema = null;
+            this.rawSchema = null;
+            this.resolvedTypes.clear();
+            return false;
+          }
         }
       }
 
@@ -101,6 +138,86 @@ export class SchemaLoader {
       this.rawSchema = null;
       this.resolvedTypes.clear();
       return false;
+    }
+  }
+
+  private computeHash(content: string): string {
+    return crypto.createHash('sha256').update(content).digest('hex');
+  }
+
+  private computeConfigHash(): string {
+    const configString = JSON.stringify({
+      maxDepth: this.validationConfig.maxDepth,
+      maxTypes: this.validationConfig.maxTypes,
+      maxFieldsPerType: this.validationConfig.maxFieldsPerType,
+    });
+    return crypto.createHash('sha256').update(configString).digest('hex');
+  }
+
+  private getCachePath(schemaPath: string): string {
+    const dir = path.dirname(schemaPath);
+    const basename = path.basename(schemaPath, path.extname(schemaPath));
+    return path.join(dir, `.${basename}.groq-cache`);
+  }
+
+  private readValidationCache(
+    cachePath: string,
+    schemaHash: string,
+    configHash: string
+  ): SchemaValidationResult | null {
+    try {
+      if (!fs.existsSync(cachePath)) {
+        return null;
+      }
+
+      const cacheContent = fs.readFileSync(cachePath, 'utf-8');
+      const cache = JSON.parse(cacheContent) as ValidationCacheEntry;
+
+      if (
+        cache.version === CACHE_VERSION &&
+        cache.schemaHash === schemaHash &&
+        cache.configHash === configHash
+      ) {
+        return { valid: cache.valid, error: cache.error };
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private writeValidationCache(
+    cachePath: string,
+    schemaHash: string,
+    configHash: string,
+    result: SchemaValidationResult
+  ): void {
+    try {
+      const cache: ValidationCacheEntry = {
+        version: CACHE_VERSION,
+        schemaHash,
+        configHash,
+        valid: result.valid,
+        error: result.error,
+      };
+      fs.writeFileSync(cachePath, JSON.stringify(cache), 'utf-8');
+    } catch {
+      // Silently fail - caching is an optimization, not critical
+    }
+  }
+
+  clearValidationCache(schemaPath?: string): void {
+    try {
+      const targetPath = schemaPath ?? this.schemaPath;
+      if (!targetPath) return;
+
+      const cachePath = this.getCachePath(path.resolve(targetPath));
+      if (fs.existsSync(cachePath)) {
+        fs.unlinkSync(cachePath);
+      }
+    } catch {
+      // Silently fail
     }
   }
 

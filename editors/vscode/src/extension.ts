@@ -47,10 +47,11 @@ export function activate(context: ExtensionContext) {
   const schemaValidationMaxDepth = config.get<number>('schema.validation.maxDepth', 50);
   const schemaValidationMaxTypes = config.get<number>('schema.validation.maxTypes', 10000);
   const schemaValidationMaxFieldsPerType = config.get<number>('schema.validation.maxFieldsPerType', 1000);
+  const schemaValidationCacheValidation = config.get<boolean>('schema.validation.cacheValidation', true);
 
   outputChannel.appendLine(`Schema path from config: ${schemaPath}`);
   outputChannel.appendLine(`Extensions - paramTypeAnnotations: ${paramTypeAnnotations}`);
-  outputChannel.appendLine(`Schema validation - enabled: ${schemaValidationEnabled}, maxDepth: ${schemaValidationMaxDepth}, maxTypes: ${schemaValidationMaxTypes}, maxFieldsPerType: ${schemaValidationMaxFieldsPerType}`);
+  outputChannel.appendLine(`Schema validation - enabled: ${schemaValidationEnabled}, maxDepth: ${schemaValidationMaxDepth}, maxTypes: ${schemaValidationMaxTypes}, maxFieldsPerType: ${schemaValidationMaxFieldsPerType}, cacheValidation: ${schemaValidationCacheValidation}`);
 
   // Resolve schema path relative to workspace
   let resolvedSchemaPath: string | undefined;
@@ -81,6 +82,7 @@ export function activate(context: ExtensionContext) {
         maxDepth: schemaValidationMaxDepth,
         maxTypes: schemaValidationMaxTypes,
         maxFieldsPerType: schemaValidationMaxFieldsPerType,
+        cacheValidation: schemaValidationCacheValidation,
       },
     },
     outputChannel,

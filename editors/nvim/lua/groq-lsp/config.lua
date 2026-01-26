@@ -17,6 +17,7 @@ M.defaults = {
         maxDepth = 50,
         maxTypes = 10000,
         maxFieldsPerType = 1000,
+        cacheValidation = true,
       },
     },
   },

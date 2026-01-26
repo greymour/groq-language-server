@@ -588,4 +588,208 @@ describe('SchemaLoader validation', () => {
       expect(loader.getTypeNames()).toContain('post');
     });
   });
+
+  describe('validation caching', () => {
+    function getCachePath(schemaPath: string): string {
+      const dir = path.dirname(schemaPath);
+      const basename = path.basename(schemaPath, path.extname(schemaPath));
+      return path.join(dir, `.${basename}.groq-cache`);
+    }
+
+    it('creates cache file after first validation', async () => {
+      const loader = new SchemaLoader({ cacheValidation: true });
+
+      const validSchema = {
+        types: [{ name: 'test', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(validSchema);
+      const cachePath = getCachePath(filePath);
+
+      expect(fs.existsSync(cachePath)).toBe(false);
+
+      await loader.loadFromPath(filePath);
+
+      expect(fs.existsSync(cachePath)).toBe(true);
+    });
+
+    it('skips validation on cache hit', async () => {
+      const loader = new SchemaLoader({ cacheValidation: true });
+
+      const validSchema = {
+        types: [{ name: 'test', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(validSchema);
+
+      await loader.loadFromPath(filePath);
+
+      const cacheContent = fs.readFileSync(getCachePath(filePath), 'utf-8');
+      const cache = JSON.parse(cacheContent);
+      expect(cache.valid).toBe(true);
+
+      const result = await loader.loadFromPath(filePath);
+      expect(result).toBe(true);
+    });
+
+    it('returns cached validation error', async () => {
+      const loader = new SchemaLoader({ maxTypes: 1, cacheValidation: true });
+
+      const invalidSchema = {
+        types: [
+          { name: 'type1', type: 'document' },
+          { name: 'type2', type: 'document' },
+        ],
+      };
+
+      const filePath = writeTempSchema(invalidSchema);
+
+      await loader.loadFromPath(filePath);
+      expect(loader.getLastValidationError()).toContain('2 types');
+
+      loader.clear();
+      const result = await loader.loadFromPath(filePath);
+      expect(result).toBe(false);
+      expect(loader.getLastValidationError()).toContain('cached');
+    });
+
+    it('invalidates cache when schema changes', async () => {
+      const loader = new SchemaLoader({ cacheValidation: true });
+
+      const schema1 = {
+        types: [{ name: 'test1', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(schema1);
+
+      await loader.loadFromPath(filePath);
+      expect(loader.getTypeNames()).toContain('test1');
+
+      const schema2 = {
+        types: [{ name: 'test2', type: 'document' }],
+      };
+      fs.writeFileSync(filePath, JSON.stringify(schema2));
+
+      await loader.loadFromPath(filePath);
+      expect(loader.getTypeNames()).toContain('test2');
+      expect(loader.getTypeNames()).not.toContain('test1');
+    });
+
+    it('invalidates cache when validation config changes', async () => {
+      const loader = new SchemaLoader({ maxTypes: 100, cacheValidation: true });
+
+      const schema = {
+        types: [
+          { name: 'type1', type: 'document' },
+          { name: 'type2', type: 'document' },
+        ],
+      };
+
+      const filePath = writeTempSchema(schema);
+
+      await loader.loadFromPath(filePath);
+      expect(loader.isLoaded()).toBe(true);
+
+      loader.updateValidationConfig({ maxTypes: 1 });
+      loader.clear();
+
+      const result = await loader.loadFromPath(filePath);
+      expect(result).toBe(false);
+      expect(loader.getLastValidationError()).toContain('2 types');
+    });
+
+    it('does not create cache when caching disabled', async () => {
+      const loader = new SchemaLoader({ cacheValidation: false });
+
+      const validSchema = {
+        types: [{ name: 'test', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(validSchema);
+      const cachePath = getCachePath(filePath);
+
+      await loader.loadFromPath(filePath);
+
+      expect(fs.existsSync(cachePath)).toBe(false);
+    });
+
+    it('clearValidationCache removes cache file', async () => {
+      const loader = new SchemaLoader({ cacheValidation: true });
+
+      const validSchema = {
+        types: [{ name: 'test', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(validSchema);
+      const cachePath = getCachePath(filePath);
+
+      await loader.loadFromPath(filePath);
+      expect(fs.existsSync(cachePath)).toBe(true);
+
+      loader.clearValidationCache();
+      expect(fs.existsSync(cachePath)).toBe(false);
+    });
+
+    it('clearValidationCache with explicit path', async () => {
+      const loader = new SchemaLoader({ cacheValidation: true });
+
+      const validSchema = {
+        types: [{ name: 'test', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(validSchema);
+      const cachePath = getCachePath(filePath);
+
+      await loader.loadFromPath(filePath);
+      expect(fs.existsSync(cachePath)).toBe(true);
+
+      const newLoader = new SchemaLoader();
+      newLoader.clearValidationCache(filePath);
+      expect(fs.existsSync(cachePath)).toBe(false);
+    });
+
+    it('handles corrupted cache file gracefully', async () => {
+      const loader = new SchemaLoader({ cacheValidation: true });
+
+      const validSchema = {
+        types: [{ name: 'test', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(validSchema);
+      const cachePath = getCachePath(filePath);
+
+      fs.writeFileSync(cachePath, 'not valid json');
+
+      const result = await loader.loadFromPath(filePath);
+      expect(result).toBe(true);
+      expect(loader.isLoaded()).toBe(true);
+    });
+
+    it('handles cache with wrong version', async () => {
+      const loader = new SchemaLoader({ cacheValidation: true });
+
+      const validSchema = {
+        types: [{ name: 'test', type: 'document' }],
+      };
+
+      const filePath = writeTempSchema(validSchema);
+      const cachePath = getCachePath(filePath);
+
+      fs.writeFileSync(cachePath, JSON.stringify({
+        version: 9999,
+        schemaHash: 'abc',
+        configHash: 'def',
+        valid: false,
+        error: 'should be ignored',
+      }));
+
+      const result = await loader.loadFromPath(filePath);
+      expect(result).toBe(true);
+    });
+
+    it('default config has caching enabled', () => {
+      const loader = new SchemaLoader();
+      expect(loader.getValidationConfig().cacheValidation).toBe(true);
+    });
+  });
 });
