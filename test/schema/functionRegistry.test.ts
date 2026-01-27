@@ -3,8 +3,8 @@ import { GroqParser } from '../../src/parser/GroqParser';
 import { FunctionRegistry } from '../../src/schema/FunctionRegistry';
 import { SchemaLoader } from '../../src/schema/SchemaLoader';
 import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function createExtensionRegistry(): ExtensionRegistry {
   const registry = new ExtensionRegistry();

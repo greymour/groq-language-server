@@ -6,8 +6,8 @@ import { getHoverInformation } from '../../src/interface/getHoverInformation';
 import { getDefinition } from '../../src/interface/getDefinition';
 import { SchemaLoader } from '../../src/schema/SchemaLoader';
 import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

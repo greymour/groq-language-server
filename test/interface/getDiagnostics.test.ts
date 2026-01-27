@@ -3,8 +3,8 @@ import { GroqParser } from '../../src/parser/GroqParser';
 import { getDiagnostics } from '../../src/interface/getDiagnostics';
 import { SchemaLoader } from '../../src/schema/SchemaLoader';
 import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../../src/extensions/index';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

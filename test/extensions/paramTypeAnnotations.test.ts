@@ -5,8 +5,8 @@ import { paramTypeAnnotationsExtension } from '../../src/extensions/paramTypeAnn
 import { ExtensionRegistry } from '../../src/extensions/ExtensionRegistry';
 import { SchemaLoader } from '../../src/schema/SchemaLoader';
 import type { FunctionDefinition } from '../../src/schema/FunctionRegistry';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
