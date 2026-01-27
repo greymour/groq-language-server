@@ -8,6 +8,7 @@ export interface FunctionParameter {
   name: string;
   inferredTypes: Set<string>;
   declaredType: string | null;
+  declaredTypeIsArray: boolean;
   typeAnnotationRange: { startIndex: number; endIndex: number } | null;
 }
 
@@ -73,6 +74,7 @@ export class FunctionRegistry {
               name: child.text,
               inferredTypes: new Set(),
               declaredType: null,
+              declaredTypeIsArray: false,
               typeAnnotationRange: null,
             });
           }

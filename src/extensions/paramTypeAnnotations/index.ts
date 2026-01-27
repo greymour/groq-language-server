@@ -29,6 +29,7 @@ export const paramTypeAnnotationsExtension: Extension = {
         const annotation = annotations.get(param.name);
         if (annotation) {
           param.declaredType = annotation.type;
+          param.declaredTypeIsArray = annotation.isArray;
           param.typeAnnotationRange = annotation.range;
         }
       }

@@ -1,5 +1,6 @@
 import type { ParseResult, Range, Position } from '../parser/ASTTypes';
 import { getSharedParser } from '../parser/GroqParser';
+import { offsetToPosition } from '../utils/positionUtils';
 
 export interface InterpolationRange {
   start: Position;
@@ -131,21 +132,6 @@ function extractGroqTagLocations(source: string): TagLocation[] {
   return locations;
 }
 
-function offsetToPosition(text: string, offset: number): Position {
-  let line = 0;
-  let character = 0;
-
-  for (let i = 0; i < offset && i < text.length; i++) {
-    if (text[i] === '\n') {
-      line++;
-      character = 0;
-    } else {
-      character++;
-    }
-  }
-
-  return { line, character };
-}
 
 export function isInsideGroqTag(source: string, position: Position): boolean {
   const tags = extractGroqTagLocations(source);

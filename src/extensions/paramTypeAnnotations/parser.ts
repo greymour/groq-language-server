@@ -2,17 +2,23 @@
  * Parses @param type annotations from comments before a function definition.
  *
  * Syntax: // @param {typeName} $paramName
+ *         // @param {typeName[]} $paramName  (for array types)
  *
  * Example:
  * ```groq
  * // @param {author} $ref
  * fn getAuthor($ref) = $ref-> { name };
+ *
+ * // @param {post[]} $refs
+ * fn getPosts($refs) = $refs[]-> { title };
  * ```
  */
 
 export interface ParamAnnotation {
-  /** The declared type name */
+  /** The declared type name (without array brackets) */
   type: string;
+  /** Whether the type is an array */
+  isArray: boolean;
   /** The parameter name (including $) */
   paramName: string;
   /** Source location of the type name for diagnostics */
@@ -39,8 +45,8 @@ export function parseParamAnnotations(
   // Look at content before the function definition
   const beforeFunc = rawSource.slice(0, funcStartIndex);
 
-  // Pattern: // @param {typeName} $paramName
-  const regex = /\/\/\s*@param\s*\{([_A-Za-z][_0-9A-Za-z]*)\}\s*(\$[_A-Za-z][_0-9A-Za-z]*)/g;
+  // Pattern: // @param {typeName} $paramName OR // @param {typeName[]} $paramName
+  const regex = /\/\/\s*@param\s*\{([_A-Za-z][_0-9A-Za-z]*)(\[\])?\}\s*(\$[_A-Za-z][_0-9A-Za-z]*)/g;
 
   // Only look at the last contiguous block of // comments before the function
   const lines = beforeFunc.split('\n');
@@ -73,7 +79,8 @@ export function parseParamAnnotations(
 
   while ((match = regex.exec(commentBlock)) !== null) {
     const typeName = match[1];
-    const paramName = match[2];
+    const isArray = match[2] === '[]';
+    const paramName = match[3];
 
     // Calculate the range of the type name within the source
     const typeStartInBlock = match.index + match[0].indexOf('{') + 1;
@@ -81,6 +88,7 @@ export function parseParamAnnotations(
 
     annotations.set(paramName, {
       type: typeName,
+      isArray,
       paramName,
       range: {
         startIndex: blockStartOffset + typeStartInBlock,

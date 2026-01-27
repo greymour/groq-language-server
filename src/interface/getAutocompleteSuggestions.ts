@@ -1,7 +1,7 @@
 import type { CompletionItem, Position } from 'vscode-languageserver';
 import type { SyntaxNode } from '../parser/ASTTypes';
-import { getNodeAtPosition, findAncestorOfType, getFieldNode } from '../parser/nodeUtils';
-import { getCharacterBeforePosition, getWordAtPosition, getNamespacePrefixAtPosition } from '../utils/positionUtils';
+import { findAncestorOfType, getFieldNode } from '../parser/nodeUtils';
+import { positionToOffset } from '../utils/positionUtils';
 import {
   getFunctionCompletions,
   getKeywordCompletions,
@@ -15,22 +15,12 @@ import {
 } from './completionData';
 import { CompletionItemKind, InsertTextFormat } from 'vscode-languageserver';
 import type { SchemaLoader } from '../schema/SchemaLoader';
-import { inferTypeContext, inferTypeContextFromText, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference';
+import { inferTypeContext, getAvailableFields, getReferenceTargetFields } from '../schema/TypeInference';
+import { resolveTypeContext } from '../schema/TypeContextResolver';
 import type { ResolvedField } from '../schema/SchemaTypes';
 import { FunctionRegistry } from '../schema/FunctionRegistry';
 import type { ExtensionRegistry } from '../extensions/index';
-
-type CompletionContext =
-  | 'empty'
-  | 'afterEverything'
-  | 'insideFilter'
-  | 'insideProjection'
-  | 'afterDot'
-  | 'afterArrow'
-  | 'afterPipe'
-  | 'functionArgs'
-  | 'orderArgs'
-  | 'general';
+import { analyzeCompletionContext, type AnalyzedContext } from './CompletionContextAnalyzer';
 
 export function getAutocompleteSuggestions(
   source: string,
@@ -39,125 +29,22 @@ export function getAutocompleteSuggestions(
   schemaLoader?: SchemaLoader,
   extensionRegistry?: ExtensionRegistry
 ): CompletionItem[] {
-  const context = determineCompletionContext(source, root, position);
+  const analyzed = analyzeCompletionContext(source, root, position);
   const functionRegistry = new FunctionRegistry();
   functionRegistry.extractFromAST(root, schemaLoader, source, extensionRegistry);
-  return getCompletionsForContext(context, source, root, position, schemaLoader, functionRegistry);
+  return getCompletionsForAnalyzedContext(analyzed, source, root, position, schemaLoader, functionRegistry);
 }
 
-function determineCompletionContext(
-  source: string,
-  root: SyntaxNode,
-  position: Position
-): CompletionContext {
-  if (source.trim() === '') {
-    return 'empty';
-  }
-
-  const charBefore = getCharacterBeforePosition(source, position);
-  const node = getNodeAtPosition(root, position);
-
-  if (charBefore === '.') {
-    return 'afterDot';
-  }
-
-  if (charBefore === '|') {
-    return 'afterPipe';
-  }
-
-  if (source.slice(-2) === '->') {
-    return 'afterArrow';
-  }
-
-  // Handle boundary cases where cursor is at end of a token
-  // and descendantForPosition returns source_file
-  if (charBefore === '[') {
-    return 'insideFilter';
-  }
-
-  if (charBefore === '{') {
-    return 'insideProjection';
-  }
-
-  // Check if we're right after 'everything' (*)
-  if (charBefore === '*' || source.trim() === '*') {
-    return 'afterEverything';
-  }
-
-  // Check text-based heuristics for incomplete expressions
-  const textBeforeCursor = source.substring(0, positionToOffset(source, position));
-  if (isInsideFilterBracket(textBeforeCursor)) {
-    return 'insideFilter';
-  }
-  if (isInsideProjectionBrace(textBeforeCursor)) {
-    return 'insideProjection';
-  }
-
-  if (node) {
-    if (node.type === 'everything') {
-      return 'afterEverything';
-    }
-
-    const subscriptAncestor = findAncestorOfType(node, 'subscript_expression');
-    if (subscriptAncestor) {
-      const baseField = getFieldNode(subscriptAncestor, 'base');
-      if (baseField && node.startIndex > baseField.endIndex) {
-        return 'insideFilter';
-      }
-    }
-
-    const projectionAncestor = findAncestorOfType(node, ['projection', 'projection_expression']);
-    if (projectionAncestor) {
-      return 'insideProjection';
-    }
-
-    const functionCallAncestor = findAncestorOfType(node, 'function_call');
-    if (functionCallAncestor) {
-      const nameNode = getFieldNode(functionCallAncestor, 'name');
-      if (nameNode?.text === 'order') {
-        return 'orderArgs';
-      }
-      return 'functionArgs';
-    }
-  }
-
-  return 'general';
-}
-
-function isInsideFilterBracket(text: string): boolean {
-  let bracketDepth = 0;
-  let braceDepth = 0;
-  for (const char of text) {
-    if (char === '[') bracketDepth++;
-    else if (char === ']') bracketDepth--;
-    else if (char === '{') braceDepth++;
-    else if (char === '}') braceDepth--;
-  }
-  return bracketDepth > 0 && braceDepth === 0;
-}
-
-function isInsideProjectionBrace(text: string): boolean {
-  let braceDepth = 0;
-  for (const char of text) {
-    if (char === '{') braceDepth++;
-    else if (char === '}') braceDepth--;
-  }
-  return braceDepth > 0;
-}
-
-function getCompletionsForContext(
-  context: CompletionContext,
+function getCompletionsForAnalyzedContext(
+  analyzed: AnalyzedContext,
   source: string,
   root: SyntaxNode,
   position: Position,
   schemaLoader?: SchemaLoader,
   functionRegistry?: FunctionRegistry
 ): CompletionItem[] {
-  const word = getWordAtPosition(source, position);
-  const node = getNodeAtPosition(root, position);
-  const namespacePrefix = getNamespacePrefixAtPosition(source, position);
+  const { context, node, namespacePrefix, currentWord: word } = analyzed;
 
-  // Check if we're inside a function body to exclude recursive suggestions
   const currentFunctionDef = node && functionRegistry
     ? functionRegistry.isInsideFunctionBody(node)
     : null;
@@ -167,10 +54,8 @@ function getCompletionsForContext(
     ? getCustomFunctionCompletions(functionRegistry, namespacePrefix, excludeFunctionName)
     : [];
 
-  // Get function completions filtered by namespace
   const funcCompletions = getFilteredFunctionCompletions(namespacePrefix);
 
-  // If we're completing a namespace, only show functions from that namespace
   if (namespacePrefix) {
     const allNamespacedFunctions = [...funcCompletions, ...customFunctionCompletions];
     return allNamespacedFunctions.filter((item) =>
@@ -345,33 +230,12 @@ function getSchemaFieldCompletions(
 ): CompletionItem[] {
   if (!schemaLoader?.isLoaded()) return [];
 
-  let context = null;
-
-  // Priority 1: Check for explicit _type filter in query
-  if (node) {
-    context = inferTypeFromExplicitFilter(node, schemaLoader);
-  }
-  if (!context?.type) {
-    // Also try text-based _type pattern matching
-    const textContext = inferTypeContextFromText(source, position, schemaLoader);
-    if (textContext?.type) {
-      context = textContext;
-    }
-  }
-
-  // Priority 2: Other inference (function body with declared types, nested projections, array fields)
-  if (!context?.type && node && functionRegistry) {
-    const funcDef = functionRegistry.isInsideFunctionBody(node);
-    if (funcDef) {
-      context = inferTypeContextInFunctionBody(node, funcDef, functionRegistry, schemaLoader);
-    }
-  }
-
-  if (!context?.type && node) {
-    context = inferTypeContext(node, schemaLoader);
-  }
-
-  if (!context) return [];
+  const context = resolveTypeContext(node, {
+    schemaLoader,
+    functionRegistry,
+    source,
+    position,
+  });
 
   const fields = getAvailableFields(context, schemaLoader);
   return fields.map((field, index) => resolvedFieldToCompletion(field, index));
@@ -460,11 +324,3 @@ function resolvedFieldToCompletion(field: ResolvedField, index: number = 0): Com
   };
 }
 
-function positionToOffset(source: string, position: Position): number {
-  const lines = source.split('\n');
-  let offset = 0;
-  for (let i = 0; i < position.line && i < lines.length; i++) {
-    offset += lines[i].length + 1;
-  }
-  return offset + position.character;
-}

@@ -5,7 +5,8 @@ import { nodeToRange } from '../parser/ASTTypes';
 import { toLSPRange } from '../utils/Range';
 import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils';
 import type { SchemaLoader } from '../schema/SchemaLoader';
-import { inferTypeContext, inferTypeContextInFunctionBody, inferTypeFromExplicitFilter, getAvailableFields } from '../schema/TypeInference';
+import { getAvailableFields } from '../schema/TypeInference';
+import { resolveTypeContext } from '../schema/TypeContextResolver';
 import { FunctionRegistry } from '../schema/FunctionRegistry';
 import type { ExtensionRegistry } from '../extensions/index';
 
@@ -44,58 +45,52 @@ export function getDiagnostics(
   parseResult: ParseResult,
   options: DiagnosticsOptions = {}
 ): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
+  const { schemaLoader, source, extensionRegistry } = options;
 
-  for (const error of parseResult.errors) {
-    diagnostics.push({
-      severity: DiagnosticSeverity.Error,
-      range: toLSPRange(error.range),
-      message: error.message,
-      source: 'groq',
-    });
-  }
-
-  // Always check for recursive function calls (doesn't require schema)
   const functionRegistry = new FunctionRegistry();
-  functionRegistry.extractFromAST(
-    parseResult.tree.rootNode,
-    options.schemaLoader,
-    options.source,
-    options.extensionRegistry
-  );
+  functionRegistry.extractFromAST(parseResult.tree.rootNode, schemaLoader, source, extensionRegistry);
 
-  const recursionErrors = validateNoRecursion(parseResult.tree.rootNode, functionRegistry);
-  diagnostics.push(...recursionErrors);
+  const validators: Array<() => Diagnostic[]> = [
+    () => collectSyntaxErrors(parseResult),
+    () => validateNoRecursion(parseResult.tree.rootNode, functionRegistry),
+  ];
 
-  if (options.schemaLoader?.isLoaded() && options.source) {
-    // Collect diagnostics from extensions (e.g., param type validation)
-    if (options.extensionRegistry) {
-      const hooks = options.extensionRegistry.getHook('getDiagnostics');
-      for (const { hook } of hooks) {
-        diagnostics.push(...hook({
-          functionDefinitions: functionRegistry.getAllDefinitions(),
-          schemaLoader: options.schemaLoader,
-          source: options.source,
-        }));
-      }
-    }
-
-    const schemaErrors = validateFieldReferences(
-      parseResult.tree.rootNode,
-      options.schemaLoader,
-      functionRegistry
+  if (schemaLoader?.isLoaded() && source) {
+    validators.push(
+      () => collectExtensionDiagnostics(extensionRegistry, functionRegistry, schemaLoader, source),
+      () => validateFieldReferences(parseResult.tree.rootNode, schemaLoader, functionRegistry),
+      () => validatePrimitiveProjections(parseResult.tree.rootNode, schemaLoader, functionRegistry),
     );
-    diagnostics.push(...schemaErrors);
-
-    const primitiveProjectionErrors = validatePrimitiveProjections(
-      parseResult.tree.rootNode,
-      options.schemaLoader,
-      functionRegistry
-    );
-    diagnostics.push(...primitiveProjectionErrors);
   }
 
-  return diagnostics;
+  return validators.flatMap(validate => validate());
+}
+
+function collectSyntaxErrors(parseResult: ParseResult): Diagnostic[] {
+  return parseResult.errors.map(error => ({
+    severity: DiagnosticSeverity.Error,
+    range: toLSPRange(error.range),
+    message: error.message,
+    source: 'groq',
+  }));
+}
+
+function collectExtensionDiagnostics(
+  extensionRegistry: ExtensionRegistry | undefined,
+  functionRegistry: FunctionRegistry,
+  schemaLoader: SchemaLoader,
+  source: string
+): Diagnostic[] {
+  if (!extensionRegistry) return [];
+
+  const hooks = extensionRegistry.getHook('getDiagnostics');
+  return hooks.flatMap(({ hook }) =>
+    hook({
+      functionDefinitions: functionRegistry.getAllDefinitions(),
+      schemaLoader,
+      source,
+    })
+  );
 }
 
 function validateFieldReferences(
@@ -144,19 +139,7 @@ function validateFieldReferences(
     const projection = findAncestorOfType(node, ['projection']);
     if (!projection) return;
 
-    // Priority 1: Check for explicit _type filter in query
-    let context = inferTypeFromExplicitFilter(node, schemaLoader);
-
-    // Priority 2: Other inference (function body with declared types, nested projections, array fields)
-    if (!context?.type) {
-      const funcDef = functionRegistry.isInsideFunctionBody(node);
-      if (funcDef) {
-        context = inferTypeContextInFunctionBody(node, funcDef, functionRegistry, schemaLoader);
-      } else {
-        context = inferTypeContext(node, schemaLoader);
-      }
-    }
-
+    const context = resolveTypeContext(node, { schemaLoader, functionRegistry });
     if (!context?.type) return;
 
     // Get available fields for this type
@@ -215,19 +198,7 @@ function validatePrimitiveProjections(
     const parentProjection = findAncestorOfType(node, ['projection']);
     if (!parentProjection) return;
 
-    // Priority 1: Check for explicit _type filter in query
-    let context = inferTypeFromExplicitFilter(parentProjection, schemaLoader);
-
-    // Priority 2: Other inference (function body with declared types, nested projections, array fields)
-    if (!context?.type) {
-      const funcDef = functionRegistry.isInsideFunctionBody(node);
-      if (funcDef) {
-        context = inferTypeContextInFunctionBody(parentProjection, funcDef, functionRegistry, schemaLoader);
-      } else {
-        context = inferTypeContext(parentProjection, schemaLoader);
-      }
-    }
-
+    const context = resolveTypeContext(parentProjection, { schemaLoader, functionRegistry });
     if (!context?.type) return;
 
     // Look up the field in the parent type
