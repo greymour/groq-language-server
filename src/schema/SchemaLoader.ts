@@ -155,9 +155,14 @@ export class SchemaLoader {
   }
 
   private getCachePath(schemaPath: string): string {
-    const dir = path.dirname(schemaPath);
-    const basename = path.basename(schemaPath, path.extname(schemaPath));
-    return path.join(dir, `.${basename}.groq-cache`);
+    const schemaPathHash = crypto.createHash('sha256').update(schemaPath).digest('hex').slice(0, 16);
+    const cacheDir = path.join(__dirname, '..', '.cache');
+
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true });
+    }
+
+    return path.join(cacheDir, `${schemaPathHash}.groq-cache`);
   }
 
   private readValidationCache(

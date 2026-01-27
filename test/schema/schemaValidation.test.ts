@@ -3,6 +3,10 @@ import { SchemaLoader } from '../../src/schema/SchemaLoader';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('SchemaLoader validation', () => {
   let tempDir: string;
@@ -591,9 +595,9 @@ describe('SchemaLoader validation', () => {
 
   describe('validation caching', () => {
     function getCachePath(schemaPath: string): string {
-      const dir = path.dirname(schemaPath);
-      const basename = path.basename(schemaPath, path.extname(schemaPath));
-      return path.join(dir, `.${basename}.groq-cache`);
+      const schemaPathHash = crypto.createHash('sha256').update(schemaPath).digest('hex').slice(0, 16);
+      const cacheDir = path.join(__dirname, '../../src/.cache');
+      return path.join(cacheDir, `${schemaPathHash}.groq-cache`);
     }
 
     it('creates cache file after first validation', async () => {
