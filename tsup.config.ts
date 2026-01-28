@@ -8,4 +8,11 @@ export default defineConfig({
   clean: true,
   target: 'node18',
   external: ['tree-sitter', 'tree-sitter-groq'],
+  noExternal: [
+    'vscode-languageserver',
+    'vscode-languageserver-textdocument',
+    'vscode-languageserver-protocol',
+    'vscode-languageserver-types',
+    'vscode-jsonrpc',
+  ],
 });
