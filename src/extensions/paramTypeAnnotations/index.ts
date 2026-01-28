@@ -42,13 +42,6 @@ export const paramTypeAnnotationsExtension: Extension = {
     getDiagnostics: (context) => {
       return validateParamTypes(context);
     },
-
-    getHoverContent: (context) => {
-      if (context.parameter?.declaredType) {
-        return `**Type:** \`${context.parameter.declaredType}\` *(from @param annotation)*`;
-      }
-      return null;
-    },
   },
 };
 
