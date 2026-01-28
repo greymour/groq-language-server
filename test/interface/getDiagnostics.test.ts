@@ -70,6 +70,25 @@ describe('getDiagnostics', () => {
     );
     expect(multiParamError).toBeUndefined();
   });
+
+  it('returns error for parameter used multiple times', () => {
+    const result = parser.parse('fn test($a) = $a + $a');
+    const diagnostics = getDiagnostics(result);
+    const multiUseError = diagnostics.find(d =>
+      d.message.includes('can only be used once')
+    );
+    expect(multiUseError).toBeDefined();
+    expect(multiUseError?.severity).toBe(1); // Error
+  });
+
+  it('returns no error for parameter used once', () => {
+    const result = parser.parse('fn test($a) = $a + 1');
+    const diagnostics = getDiagnostics(result);
+    const multiUseError = diagnostics.find(d =>
+      d.message.includes('can only be used once')
+    );
+    expect(multiUseError).toBeUndefined();
+  });
 });
 
 describe('param type annotation validation', () => {

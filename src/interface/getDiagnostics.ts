@@ -54,6 +54,7 @@ export function getDiagnostics(
     () => collectSyntaxErrors(parseResult),
     () => validateNoRecursion(parseResult.tree.rootNode, functionRegistry),
     () => validateSingleParameter(parseResult.tree.rootNode),
+    () => validateSingleParameterUsage(parseResult.tree.rootNode),
   ];
 
   if (schemaLoader?.isLoaded() && source) {
@@ -271,6 +272,46 @@ function validateSingleParameter(root: SyntaxNode): Diagnostic[] {
         message: `GROQ functions can only have one parameter. Function "${nameNode?.text ?? 'unknown'}" has ${params.length} parameters.`,
         source: 'groq',
       });
+    }
+  });
+
+  return diagnostics;
+}
+
+function validateSingleParameterUsage(root: SyntaxNode): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  walkTree(root, (node) => {
+    if (node.type !== 'function_definition') return;
+
+    const nameNode = getFieldNode(node, 'name');
+    const paramListNode = node.children.find(c => c.type === 'parameter_list');
+    const bodyNode = getFieldNode(node, 'body');
+
+    if (!paramListNode || !bodyNode) return;
+
+    const params = paramListNode.children.filter(c => c.type === 'variable');
+
+    for (const param of params) {
+      const paramName = param.text;
+      const usages: SyntaxNode[] = [];
+
+      walkTree(bodyNode, (bodyChild) => {
+        if (bodyChild.type === 'variable' && bodyChild.text === paramName) {
+          usages.push(bodyChild);
+        }
+      });
+
+      if (usages.length > 1) {
+        for (const usage of usages.slice(1)) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: toLSPRange(nodeToRange(usage)),
+            message: `Parameter "${paramName}" can only be used once in function "${nameNode?.text ?? 'unknown'}".`,
+            source: 'groq',
+          });
+        }
+      }
     }
   });
 
