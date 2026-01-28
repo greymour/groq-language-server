@@ -53,6 +53,7 @@ export function getDiagnostics(
   const validators: Array<() => Diagnostic[]> = [
     () => collectSyntaxErrors(parseResult),
     () => validateNoRecursion(parseResult.tree.rootNode, functionRegistry),
+    () => validateSingleParameter(parseResult.tree.rootNode),
   ];
 
   if (schemaLoader?.isLoaded() && source) {
@@ -244,6 +245,30 @@ function validateNoRecursion(
         severity: DiagnosticSeverity.Error,
         range: toLSPRange(nodeToRange(nameNode)),
         message: `Recursive function calls are not supported in GROQ`,
+        source: 'groq',
+      });
+    }
+  });
+
+  return diagnostics;
+}
+
+function validateSingleParameter(root: SyntaxNode): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  walkTree(root, (node) => {
+    if (node.type !== 'function_definition') return;
+
+    const paramListNode = node.children.find(c => c.type === 'parameter_list');
+    if (!paramListNode) return;
+
+    const params = paramListNode.children.filter(c => c.type === 'variable');
+    if (params.length > 1) {
+      const nameNode = getFieldNode(node, 'name');
+      diagnostics.push({
+        severity: DiagnosticSeverity.Error,
+        range: toLSPRange(nodeToRange(paramListNode)),
+        message: `GROQ functions can only have one parameter. Function "${nameNode?.text ?? 'unknown'}" has ${params.length} parameters.`,
         source: 'groq',
       });
     }

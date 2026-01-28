@@ -50,6 +50,26 @@ describe('getDiagnostics', () => {
     expect(diagnostics[0].range).toBeDefined();
     expect(diagnostics[0].range.start.line).toBe(0);
   });
+
+  it('returns error for function with multiple parameters', () => {
+    const result = parser.parse('fn test($a, $b) = $a + $b');
+    const diagnostics = getDiagnostics(result);
+    const multiParamError = diagnostics.find(d =>
+      d.message.includes('can only have one parameter')
+    );
+    expect(multiParamError).toBeDefined();
+    expect(multiParamError?.severity).toBe(1); // Error
+    expect(multiParamError?.message).toContain('2 parameters');
+  });
+
+  it('returns no error for function with single parameter', () => {
+    const result = parser.parse('fn test($a) = $a + 1');
+    const diagnostics = getDiagnostics(result);
+    const multiParamError = diagnostics.find(d =>
+      d.message.includes('can only have one parameter')
+    );
+    expect(multiParamError).toBeUndefined();
+  });
 });
 
 describe('param type annotation validation', () => {
