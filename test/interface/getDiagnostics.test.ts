@@ -89,6 +89,25 @@ describe('getDiagnostics', () => {
     );
     expect(multiUseError).toBeUndefined();
   });
+
+  it('returns error for parent scope in function body', () => {
+    const result = parser.parse('fn test($a) = *[_type == "post" && author._ref == ^._id]');
+    const diagnostics = getDiagnostics(result);
+    const parentScopeError = diagnostics.find(d =>
+      d.message.includes('Parent scope operator')
+    );
+    expect(parentScopeError).toBeDefined();
+    expect(parentScopeError?.severity).toBe(1); // Error
+  });
+
+  it('returns no error for parent scope outside function', () => {
+    const result = parser.parse('*[_type == "author"]{ "posts": *[author._ref == ^._id] }');
+    const diagnostics = getDiagnostics(result);
+    const parentScopeError = diagnostics.find(d =>
+      d.message.includes('Parent scope operator')
+    );
+    expect(parentScopeError).toBeUndefined();
+  });
 });
 
 describe('param type annotation validation', () => {

@@ -55,6 +55,7 @@ export function getDiagnostics(
     () => validateNoRecursion(parseResult.tree.rootNode, functionRegistry),
     () => validateSingleParameter(parseResult.tree.rootNode),
     () => validateSingleParameterUsage(parseResult.tree.rootNode),
+    () => validateNoParentScope(parseResult.tree.rootNode),
   ];
 
   if (schemaLoader?.isLoaded() && source) {
@@ -313,6 +314,32 @@ function validateSingleParameterUsage(root: SyntaxNode): Diagnostic[] {
         }
       }
     }
+  });
+
+  return diagnostics;
+}
+
+function validateNoParentScope(root: SyntaxNode): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  walkTree(root, (node) => {
+    if (node.type !== 'function_definition') return;
+
+    const nameNode = getFieldNode(node, 'name');
+    const bodyNode = getFieldNode(node, 'body');
+
+    if (!bodyNode) return;
+
+    walkTree(bodyNode, (bodyChild) => {
+      if (bodyChild.type === 'parent') {
+        diagnostics.push({
+          severity: DiagnosticSeverity.Error,
+          range: toLSPRange(nodeToRange(bodyChild)),
+          message: `Parent scope operator "^" cannot be used in function "${nameNode?.text ?? 'unknown'}".`,
+          source: 'groq',
+        });
+      }
+    });
   });
 
   return diagnostics;
