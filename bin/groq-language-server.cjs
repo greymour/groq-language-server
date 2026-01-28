@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { startServer } = require('../dist/server');
+const { startServer } = require('../dist/server.cjs');
 
 const args = process.argv.slice(2);
 const useStdio = args.includes('--stdio');

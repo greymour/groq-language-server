@@ -116,7 +116,7 @@
     "build": "npm run build:extension && npm run build:server",
     "build:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "build:server": "rm -rf server && mkdir -p server/node_modules && cp -r ../../dist server/ && cp -r ../../node_modules/tree-sitter server/node_modules/ && cp -r ../../node_modules/tree-sitter-groq server/node_modules/ && cp -r ../../node_modules/node-gyp-build server/node_modules/ 2>/dev/null || true && cp -r ../../node_modules/vscode-languageserver server/node_modules/ && cp -r ../../node_modules/vscode-languageserver-textdocument server/node_modules/ && cp -r ../../node_modules/vscode-languageserver-protocol server/node_modules/ && cp -r ../../node_modules/vscode-languageserver-types server/node_modules/ && cp -r ../../node_modules/vscode-jsonrpc server/node_modules/",
-    "postbuild:server": "echo '#!/usr/bin/env node\nconst { startServer } = require(\"./dist/server\");\nstartServer({ method: \"stdio\" });' > server/groq-language-server.js",
+    "postbuild:server": "echo '#!/usr/bin/env node\nconst { startServer } = require(\"./dist/server.cjs\");\nstartServer({ method: \"stdio\" });' > server/groq-language-server.js",
     "watch": "npm run build:extension -- --watch",
     "package": "vsce package",
     "publish": "vsce publish"

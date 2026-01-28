@@ -2,10 +2,11 @@
   "name": "groq-language-server",
   "version": "0.1.0",
   "description": "Language Server Protocol implementation for the GROQ query language",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "types": "dist/index.d.cts",
   "bin": {
-    "groq-language-server": "./bin/groq-language-server.js"
+    "groq-language-server": "./bin/groq-language-server.cjs"
   },
   "scripts": {
     "build": "tsup",
