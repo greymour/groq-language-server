@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { workspace, ExtensionContext, window } from 'vscode';
+import { workspace, ExtensionContext, window, commands } from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -8,12 +8,10 @@ import {
   TransportKind,
 } from 'vscode-languageclient/node';
 
-let client: LanguageClient;
+let client: LanguageClient | undefined;
 const outputChannel = window.createOutputChannel('GROQ Language Server');
 
-export function activate(context: ExtensionContext) {
-  outputChannel.appendLine('GROQ extension activating...');
-
+function getClientOptions(context: ExtensionContext): { serverOptions: ServerOptions; clientOptions: LanguageClientOptions } | undefined {
   const serverModule = context.asAbsolutePath(
     path.join('server', 'groq-language-server.js')
   );
@@ -23,7 +21,7 @@ export function activate(context: ExtensionContext) {
 
   if (!fs.existsSync(serverModule)) {
     window.showErrorMessage(`GROQ Language Server not found at: ${serverModule}`);
-    return;
+    return undefined;
   }
 
   const serverOptions: ServerOptions = {
@@ -53,7 +51,6 @@ export function activate(context: ExtensionContext) {
   outputChannel.appendLine(`Extensions - paramTypeAnnotations: ${paramTypeAnnotations}`);
   outputChannel.appendLine(`Schema validation - enabled: ${schemaValidationEnabled}, maxDepth: ${schemaValidationMaxDepth}, maxTypes: ${schemaValidationMaxTypes}, maxFieldsPerType: ${schemaValidationMaxFieldsPerType}, cacheValidation: ${schemaValidationCacheValidation}`);
 
-  // Resolve schema path relative to workspace
   let resolvedSchemaPath: string | undefined;
   if (schemaPath && workspace.workspaceFolders?.[0]) {
     resolvedSchemaPath = path.resolve(workspace.workspaceFolders[0].uri.fsPath, schemaPath);
@@ -88,19 +85,46 @@ export function activate(context: ExtensionContext) {
     outputChannel,
   };
 
+  return { serverOptions, clientOptions };
+}
+
+async function startClient(context: ExtensionContext): Promise<void> {
+  const options = getClientOptions(context);
+  if (!options) return;
+
   client = new LanguageClient(
     'groq',
     'GROQ Language Server',
-    serverOptions,
-    clientOptions
+    options.serverOptions,
+    options.clientOptions
   );
 
-  client.start().then(() => {
+  try {
+    await client.start();
     outputChannel.appendLine('GROQ Language Server started successfully');
-  }).catch((error) => {
+  } catch (error) {
     outputChannel.appendLine(`Failed to start GROQ Language Server: ${error}`);
     window.showErrorMessage(`Failed to start GROQ Language Server: ${error}`);
-  });
+  }
+}
+
+async function restartClient(context: ExtensionContext): Promise<void> {
+  outputChannel.appendLine('Restarting GROQ Language Server...');
+  if (client) {
+    await client.stop();
+    client = undefined;
+  }
+  await startClient(context);
+}
+
+export function activate(context: ExtensionContext) {
+  outputChannel.appendLine('GROQ extension activating...');
+
+  startClient(context);
+
+  context.subscriptions.push(
+    commands.registerCommand('groq.restartServer', () => restartClient(context))
+  );
 
   outputChannel.appendLine('GROQ extension activated');
 }
