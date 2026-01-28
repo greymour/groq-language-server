@@ -47,12 +47,14 @@ function findSimilarTypes(target: string, availableTypes: string[]): string {
   const targetLower = target.toLowerCase();
   const scored = availableTypes.map(type => ({
     type,
-    score: similarityScore(targetLower, type.toLowerCase()),
+    distance: levenshteinDistance(targetLower, type.toLowerCase()),
   }));
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => a.distance - b.distance);
 
-  const topMatches = scored.slice(0, 5).filter(s => s.score > 0);
+  // Only show types within a reasonable edit distance (half the target length, minimum 5)
+  const maxDistance = Math.max(5, Math.floor(target.length / 2));
+  const topMatches = scored.slice(0, 5).filter(s => s.distance <= maxDistance);
   const remaining = availableTypes.length - topMatches.length;
 
   if (topMatches.length === 0) {
@@ -67,40 +69,38 @@ function findSimilarTypes(target: string, availableTypes: string[]): string {
 }
 
 /**
- * Calculate similarity score between two strings.
- * Higher score = more similar.
+ * Calculate Levenshtein distance between two strings.
+ * Returns the minimum number of single-character edits (insertions, deletions, substitutions)
+ * required to transform one string into the other.
  */
-function similarityScore(target: string, candidate: string): number {
-  let score = 0;
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
 
-  // Exact substring match (highest priority)
-  if (candidate.includes(target) || target.includes(candidate)) {
-    score += 100;
+  // Use two rows instead of full matrix for space efficiency
+  let prevRow = new Array<number>(b.length + 1);
+  let currRow = new Array<number>(b.length + 1);
+
+  for (let j = 0; j <= b.length; j++) {
+    prevRow[j] = j;
   }
 
-  // Common prefix
-  let prefixLen = 0;
-  while (prefixLen < target.length && prefixLen < candidate.length && target[prefixLen] === candidate[prefixLen]) {
-    prefixLen++;
+  for (let i = 1; i <= a.length; i++) {
+    currRow[0] = i;
+
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      currRow[j] = Math.min(
+        prevRow[j] + 1,      // deletion
+        currRow[j - 1] + 1,  // insertion
+        prevRow[j - 1] + cost // substitution
+      );
+    }
+
+    [prevRow, currRow] = [currRow, prevRow];
   }
-  score += prefixLen * 10;
 
-  // Common suffix
-  let suffixLen = 0;
-  while (
-    suffixLen < target.length &&
-    suffixLen < candidate.length &&
-    target[target.length - 1 - suffixLen] === candidate[candidate.length - 1 - suffixLen]
-  ) {
-    suffixLen++;
-  }
-  score += suffixLen * 5;
-
-  // Levenshtein-inspired: penalize length difference
-  const lenDiff = Math.abs(target.length - candidate.length);
-  score -= lenDiff * 2;
-
-  return score;
+  return prevRow[b.length];
 }
 
 /**
