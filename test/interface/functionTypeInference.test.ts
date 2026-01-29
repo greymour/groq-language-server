@@ -340,10 +340,10 @@ fn custom::getLinkTitles($ref) = $ref[] {
     it('handles multiple function definitions and calls', () => {
       const query = `
 fn utils::double($x) = $x * 2;
-fn utils::add($a, $b) = $a + $b;
+fn utils::increment($x) = $x + 1;
 
 *[_type == "post"] {
-  "computed": utils::add(1, utils::double(2))
+  "computed": utils::increment(utils::double(2))
 }
       `;
       const result = parser.parse(query);
@@ -353,7 +353,7 @@ fn utils::add($a, $b) = $a + $b;
       const utilsErrors = diagnostics.filter(d =>
         d.message.includes('utils') ||
         d.message.includes('double') ||
-        d.message.includes('add')
+        d.message.includes('increment')
       );
       expect(utilsErrors).toHaveLength(0);
     });

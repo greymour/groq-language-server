@@ -18,8 +18,6 @@ const PRIMITIVE_TYPES = new Set([
   'datetime',
   'date',
   'url',
-  'slug',
-  'geopoint',
 ]);
 
 const BUILT_IN_FIELD_TYPES: Record<string, string> = {
