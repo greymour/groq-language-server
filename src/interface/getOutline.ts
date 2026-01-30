@@ -1,9 +1,9 @@
-import type { SymbolInformation } from 'vscode-languageserver';
-import { SymbolKind } from 'vscode-languageserver';
-import type { SyntaxNode } from '../parser/ASTTypes';
-import { nodeToRange } from '../parser/ASTTypes';
-import { toLSPRange } from '../utils/Range';
-import { walkTree, getFieldNode } from '../parser/nodeUtils';
+import type { SymbolInformation } from "vscode-languageserver";
+import { SymbolKind } from "vscode-languageserver";
+import type { SyntaxNode } from "../parser/ASTTypes";
+import { nodeToRange } from "../parser/ASTTypes";
+import { toLSPRange } from "../utils/Range";
+import { walkTree, getFieldNode } from "../parser/nodeUtils";
 
 export function getOutline(root: SyntaxNode, uri: string): SymbolInformation[] {
   const symbols: SymbolInformation[] = [];
@@ -20,8 +20,8 @@ export function getOutline(root: SyntaxNode, uri: string): SymbolInformation[] {
 
 function nodeToSymbol(node: SyntaxNode, uri: string): SymbolInformation | null {
   switch (node.type) {
-    case 'function_call': {
-      const nameNode = getFieldNode(node, 'name');
+    case "function_call": {
+      const nameNode = getFieldNode(node, "name");
       if (nameNode) {
         return {
           name: `${nameNode.text}()`,
@@ -35,12 +35,11 @@ function nodeToSymbol(node: SyntaxNode, uri: string): SymbolInformation | null {
       return null;
     }
 
-    case 'projection_pair': {
-      const keyNode = getFieldNode(node, 'key');
+    case "projection_pair": {
+      const keyNode = getFieldNode(node, "key");
       if (keyNode) {
-        const keyText = keyNode.type === 'string'
-          ? keyNode.text.slice(1, -1)
-          : keyNode.text;
+        const keyText =
+          keyNode.type === "string" ? keyNode.text.slice(1, -1) : keyNode.text;
         return {
           name: keyText,
           kind: SymbolKind.Field,
@@ -53,7 +52,7 @@ function nodeToSymbol(node: SyntaxNode, uri: string): SymbolInformation | null {
       return null;
     }
 
-    case 'variable': {
+    case "variable": {
       return {
         name: node.text,
         kind: SymbolKind.Variable,
@@ -64,8 +63,8 @@ function nodeToSymbol(node: SyntaxNode, uri: string): SymbolInformation | null {
       };
     }
 
-    case 'subscript_expression': {
-      const indexNode = getFieldNode(node, 'index');
+    case "subscript_expression": {
+      const indexNode = getFieldNode(node, "index");
       if (indexNode && isTypeFilter(indexNode)) {
         const typeValue = extractTypeValue(indexNode);
         if (typeValue) {
@@ -82,13 +81,13 @@ function nodeToSymbol(node: SyntaxNode, uri: string): SymbolInformation | null {
       return null;
     }
 
-    case 'pipe_expression': {
-      const rightNode = getFieldNode(node, 'right');
-      if (rightNode?.type === 'function_call') {
-        const nameNode = getFieldNode(rightNode, 'name');
-        if (nameNode?.text === 'order') {
+    case "pipe_expression": {
+      const rightNode = getFieldNode(node, "right");
+      if (rightNode?.type === "function_call") {
+        const nameNode = getFieldNode(rightNode, "name");
+        if (nameNode?.text === "order") {
           return {
-            name: '| order(...)',
+            name: "| order(...)",
             kind: SymbolKind.Operator,
             location: {
               uri,
@@ -96,9 +95,9 @@ function nodeToSymbol(node: SyntaxNode, uri: string): SymbolInformation | null {
             },
           };
         }
-        if (nameNode?.text === 'score') {
+        if (nameNode?.text === "score") {
           return {
-            name: '| score(...)',
+            name: "| score(...)",
             kind: SymbolKind.Operator,
             location: {
               uri,
@@ -116,10 +115,14 @@ function nodeToSymbol(node: SyntaxNode, uri: string): SymbolInformation | null {
 }
 
 function isTypeFilter(node: SyntaxNode): boolean {
-  if (node.type === 'comparison_expression') {
-    const left = getFieldNode(node, 'left');
-    const operator = getFieldNode(node, 'operator');
-    if (left?.type === 'identifier' && left.text === '_type' && operator?.text === '==') {
+  if (node.type === "comparison_expression") {
+    const left = getFieldNode(node, "left");
+    const operator = getFieldNode(node, "operator");
+    if (
+      left?.type === "identifier" &&
+      left.text === "_type" &&
+      operator?.text === "=="
+    ) {
       return true;
     }
   }
@@ -127,12 +130,14 @@ function isTypeFilter(node: SyntaxNode): boolean {
 }
 
 function extractTypeValue(node: SyntaxNode): string | null {
-  if (node.type === 'comparison_expression') {
-    const right = getFieldNode(node, 'right');
-    if (right?.type === 'string') {
+  if (node.type === "comparison_expression") {
+    const right = getFieldNode(node, "right");
+    if (right?.type === "string") {
       const text = right.text;
-      if ((text.startsWith('"') && text.endsWith('"')) ||
-          (text.startsWith("'") && text.endsWith("'"))) {
+      if (
+        (text.startsWith('"') && text.endsWith('"')) ||
+        (text.startsWith("'") && text.endsWith("'"))
+      ) {
         return text.slice(1, -1);
       }
     }

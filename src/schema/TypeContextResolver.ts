@@ -1,13 +1,13 @@
-import type { SyntaxNode } from '../parser/ASTTypes';
-import type { SchemaLoader } from './SchemaLoader';
-import type { FunctionRegistry } from './FunctionRegistry';
-import type { InferredContext } from './TypeInference';
+import type { SyntaxNode } from "../parser/ASTTypes";
+import type { SchemaLoader } from "./SchemaLoader";
+import type { FunctionRegistry } from "./FunctionRegistry";
+import type { InferredContext } from "./TypeInference";
 import {
   inferTypeFromExplicitFilter,
   inferTypeContextInFunctionBody,
   inferTypeContext,
   inferTypeContextFromText,
-} from './TypeInference';
+} from "./TypeInference";
 
 export interface ResolverOptions {
   schemaLoader: SchemaLoader;
@@ -32,7 +32,11 @@ export function resolveTypeContext(
 
   // Priority 2: Text-based _type pattern (for incomplete expressions)
   if (source && position) {
-    const textContext = inferTypeContextFromText(source, position, schemaLoader);
+    const textContext = inferTypeContextFromText(
+      source,
+      position,
+      schemaLoader
+    );
     if (textContext?.type) {
       return textContext;
     }

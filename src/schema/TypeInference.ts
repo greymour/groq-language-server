@@ -1,8 +1,12 @@
-import type { SyntaxNode } from '../parser/ASTTypes';
-import { getFieldNode, findAncestorOfType, walkTree } from '../parser/nodeUtils';
-import type { SchemaLoader } from './SchemaLoader';
-import type { ResolvedType, ResolvedField } from './SchemaTypes';
-import type { FunctionRegistry, FunctionDefinition } from './FunctionRegistry';
+import type { SyntaxNode } from "../parser/ASTTypes";
+import {
+  getFieldNode,
+  findAncestorOfType,
+  walkTree,
+} from "../parser/nodeUtils";
+import type { SchemaLoader } from "./SchemaLoader";
+import type { ResolvedType, ResolvedField } from "./SchemaTypes";
+import type { FunctionRegistry, FunctionDefinition } from "./FunctionRegistry";
 
 export interface InferredContext {
   type: ResolvedType | null;
@@ -54,11 +58,14 @@ export function inferTypeContextFromText(
   return context;
 }
 
-function getTextBeforeCursor(source: string, position: { line: number; character: number }): string {
-  const lines = source.split('\n');
-  let result = '';
+function getTextBeforeCursor(
+  source: string,
+  position: { line: number; character: number }
+): string {
+  const lines = source.split("\n");
+  let result = "";
   for (let i = 0; i < position.line && i < lines.length; i++) {
-    result += lines[i] + '\n';
+    result += lines[i] + "\n";
   }
   if (position.line < lines.length) {
     result += lines[position.line].substring(0, position.character);
@@ -66,7 +73,10 @@ function getTextBeforeCursor(source: string, position: { line: number; character
   return result;
 }
 
-function findArrayItemType(fieldName: string, schemaLoader: SchemaLoader): ResolvedType | null {
+function findArrayItemType(
+  fieldName: string,
+  schemaLoader: SchemaLoader
+): ResolvedType | null {
   for (const typeName of schemaLoader.getTypeNames()) {
     const field = schemaLoader.getField(typeName, fieldName);
     if (field?.isArray && field.arrayOf?.length) {
@@ -149,19 +159,22 @@ function finalizeContext(
   node: SyntaxNode,
   schemaLoader: SchemaLoader
 ): InferredContext {
-
-  const accessExpr = findAncestorOfType(node, ['access_expression', 'dereference_expression']);
+  const accessExpr = findAncestorOfType(node, [
+    "access_expression",
+    "dereference_expression",
+  ]);
   if (accessExpr && context.type) {
-    const memberNode = getFieldNode(accessExpr, 'member');
+    const memberNode = getFieldNode(accessExpr, "member");
     if (memberNode) {
-      context.field = schemaLoader.getField(context.type.name, memberNode.text) ?? null;
+      context.field =
+        schemaLoader.getField(context.type.name, memberNode.text) ?? null;
     }
   }
 
-  const subscriptExpr = findAncestorOfType(node, 'subscript_expression');
+  const subscriptExpr = findAncestorOfType(node, "subscript_expression");
   if (subscriptExpr) {
-    const baseNode = getFieldNode(subscriptExpr, 'base');
-    if (baseNode?.type === 'everything') {
+    const baseNode = getFieldNode(subscriptExpr, "base");
+    if (baseNode?.type === "everything") {
       context.isArray = true;
     }
   }
@@ -174,18 +187,18 @@ function inferArrayFieldType(
   schemaLoader: SchemaLoader
 ): ResolvedType | null {
   // Look for projection ancestor
-  const projection = findAncestorOfType(node, ['projection']);
+  const projection = findAncestorOfType(node, ["projection"]);
   if (!projection || !projection.parent) return null;
 
   // Check if the projection's parent is a projection_expression
   const projExpr = projection.parent;
-  if (projExpr.type !== 'projection_expression') return null;
+  if (projExpr.type !== "projection_expression") return null;
 
   // In a projection_expression, find the subscript_expression sibling
   let subscriptExpr: SyntaxNode | null = null;
   for (let i = 0; i < projExpr.childCount; i++) {
     const child = projExpr.child(i);
-    if (child?.type === 'subscript_expression') {
+    if (child?.type === "subscript_expression") {
       subscriptExpr = child;
       break;
     }
@@ -194,8 +207,8 @@ function inferArrayFieldType(
   if (!subscriptExpr) return null;
 
   // Get the base of the subscript (the field name)
-  const baseNode = getFieldNode(subscriptExpr, 'base');
-  if (!baseNode || baseNode.type !== 'identifier') return null;
+  const baseNode = getFieldNode(subscriptExpr, "base");
+  if (!baseNode || baseNode.type !== "identifier") return null;
 
   const fieldName = baseNode.text;
 
@@ -238,24 +251,24 @@ function inferNestedFieldType(
 ): ResolvedType | null {
   // Find the projection we're inside - could be the node itself or an ancestor
   let projection: SyntaxNode | null = null;
-  if (node.type === 'projection') {
+  if (node.type === "projection") {
     projection = node;
   } else {
-    projection = findAncestorOfType(node, ['projection']);
+    projection = findAncestorOfType(node, ["projection"]);
   }
 
   if (!projection || !projection.parent) return null;
 
   // Check if the projection's parent is a projection_expression
   const projExpr = projection.parent;
-  if (projExpr.type !== 'projection_expression') return null;
+  if (projExpr.type !== "projection_expression") return null;
 
   // Get the base of the projection_expression
-  const baseNode = getFieldNode(projExpr, 'base');
+  const baseNode = getFieldNode(projExpr, "base");
   if (!baseNode) return null;
 
   // If the base is an identifier, it's a simple field projection like `video { }`
-  if (baseNode.type === 'identifier') {
+  if (baseNode.type === "identifier") {
     const fieldName = baseNode.text;
 
     // Get the parent type context by looking at the outer projection
@@ -273,7 +286,7 @@ function inferNestedFieldType(
     }
 
     // If it's an inline/object field, try to get its type
-    if (field.type && field.type !== 'object') {
+    if (field.type && field.type !== "object") {
       return schemaLoader.getType(field.type) ?? null;
     }
   }
@@ -289,25 +302,31 @@ function getParentTypeContext(
   let current: SyntaxNode | null = projExpr.parent;
 
   while (current) {
-    if (current.type === 'projection') {
+    if (current.type === "projection") {
       const parentProjExpr = current.parent;
-      if (parentProjExpr?.type === 'projection_expression') {
-        const baseNode = getFieldNode(parentProjExpr, 'base');
+      if (parentProjExpr?.type === "projection_expression") {
+        const baseNode = getFieldNode(parentProjExpr, "base");
 
         // Handle simple field projection like `video { }`
-        if (baseNode?.type === 'identifier') {
+        if (baseNode?.type === "identifier") {
           const fieldName = baseNode.text;
           // Recursively get parent context
-          const grandparentContext = getParentTypeContext(parentProjExpr, schemaLoader);
+          const grandparentContext = getParentTypeContext(
+            parentProjExpr,
+            schemaLoader
+          );
           if (grandparentContext) {
-            const field = schemaLoader.getField(grandparentContext.name, fieldName);
+            const field = schemaLoader.getField(
+              grandparentContext.name,
+              fieldName
+            );
             if (field) {
               // Reference field - return target type
               if (field.isReference && field.referenceTargets?.length) {
                 return schemaLoader.getType(field.referenceTargets[0]) ?? null;
               }
               // Inline/object field - return its type
-              if (field.type && field.type !== 'object') {
+              if (field.type && field.type !== "object") {
                 return schemaLoader.getType(field.type) ?? null;
               }
             }
@@ -319,16 +338,16 @@ function getParentTypeContext(
               if (field.isReference && field.referenceTargets?.length) {
                 return schemaLoader.getType(field.referenceTargets[0]) ?? null;
               }
-              if (field.type && field.type !== 'object') {
+              if (field.type && field.type !== "object") {
                 return schemaLoader.getType(field.type) ?? null;
               }
             }
           }
         }
 
-        if (baseNode?.type === 'subscript_expression') {
+        if (baseNode?.type === "subscript_expression") {
           // Check for type filter in the subscript
-          const indexNode = getFieldNode(baseNode, 'index');
+          const indexNode = getFieldNode(baseNode, "index");
           if (indexNode) {
             const typeComparison = findTypeComparison(indexNode);
             if (typeComparison) {
@@ -340,13 +359,19 @@ function getParentTypeContext(
           }
 
           // Check if it's an array field access like `fieldName[]`
-          const arrayBase = getFieldNode(baseNode, 'base');
-          if (arrayBase?.type === 'identifier') {
+          const arrayBase = getFieldNode(baseNode, "base");
+          if (arrayBase?.type === "identifier") {
             const fieldName = arrayBase.text;
             // Recursively get parent context
-            const grandparentContext = getParentTypeContext(parentProjExpr, schemaLoader);
+            const grandparentContext = getParentTypeContext(
+              parentProjExpr,
+              schemaLoader
+            );
             if (grandparentContext) {
-              const field = schemaLoader.getField(grandparentContext.name, fieldName);
+              const field = schemaLoader.getField(
+                grandparentContext.name,
+                fieldName
+              );
               if (field?.isArray && field.arrayOf?.length) {
                 return schemaLoader.getType(field.arrayOf[0]) ?? null;
               }
@@ -364,8 +389,8 @@ function getParentTypeContext(
     }
 
     // Check for type filter at this level
-    if (current.type === 'subscript_expression') {
-      const indexNode = getFieldNode(current, 'index');
+    if (current.type === "subscript_expression") {
+      const indexNode = getFieldNode(current, "index");
       if (indexNode) {
         const typeComparison = findTypeComparison(indexNode);
         if (typeComparison) {
@@ -388,8 +413,8 @@ function findTypeFilter(node: SyntaxNode): SyntaxNode | null {
 
   while (current) {
     // Direct subscript_expression ancestor
-    if (current.type === 'subscript_expression') {
-      const indexNode = getFieldNode(current, 'index');
+    if (current.type === "subscript_expression") {
+      const indexNode = getFieldNode(current, "index");
       if (indexNode) {
         const typeComparison = findTypeComparison(indexNode);
         if (typeComparison) {
@@ -399,10 +424,13 @@ function findTypeFilter(node: SyntaxNode): SyntaxNode | null {
     }
 
     // When inside a projection, check the sibling subscript_expression
-    if (current.type === 'projection' && current.parent?.type === 'projection_expression') {
-      const baseNode = getFieldNode(current.parent, 'base');
-      if (baseNode?.type === 'subscript_expression') {
-        const indexNode = getFieldNode(baseNode, 'index');
+    if (
+      current.type === "projection" &&
+      current.parent?.type === "projection_expression"
+    ) {
+      const baseNode = getFieldNode(current.parent, "base");
+      if (baseNode?.type === "subscript_expression") {
+        const indexNode = getFieldNode(baseNode, "index");
         if (indexNode) {
           const typeComparison = findTypeComparison(indexNode);
           if (typeComparison) {
@@ -436,18 +464,18 @@ function findTypeComparison(node: SyntaxNode): SyntaxNode | null {
 }
 
 function isTypeComparison(node: SyntaxNode): boolean {
-  if (node.type !== 'comparison_expression') {
+  if (node.type !== "comparison_expression") {
     return false;
   }
 
-  const leftNode = getFieldNode(node, 'left');
-  const operatorNode = getFieldNode(node, 'operator');
+  const leftNode = getFieldNode(node, "left");
+  const operatorNode = getFieldNode(node, "operator");
 
-  if (leftNode?.type !== 'identifier' || leftNode.text !== '_type') {
+  if (leftNode?.type !== "identifier" || leftNode.text !== "_type") {
     return false;
   }
 
-  if (operatorNode?.text !== '==') {
+  if (operatorNode?.text !== "==") {
     return false;
   }
 
@@ -455,16 +483,18 @@ function isTypeComparison(node: SyntaxNode): boolean {
 }
 
 function extractTypeName(comparisonNode: SyntaxNode): string | null {
-  const rightNode = getFieldNode(comparisonNode, 'right');
+  const rightNode = getFieldNode(comparisonNode, "right");
 
   if (!rightNode) {
     return null;
   }
 
-  if (rightNode.type === 'string') {
+  if (rightNode.type === "string") {
     const text = rightNode.text;
-    if ((text.startsWith('"') && text.endsWith('"')) ||
-        (text.startsWith("'") && text.endsWith("'"))) {
+    if (
+      (text.startsWith('"') && text.endsWith('"')) ||
+      (text.startsWith("'") && text.endsWith("'"))
+    ) {
       return text.slice(1, -1);
     }
   }
@@ -530,14 +560,23 @@ export function inferTypeContextInFunctionBody(
   };
 
   // Try to find parameter context by tracing back through projections
-  const paramContext = findParameterContextInFunctionBody(node, functionDef, functionRegistry, schemaLoader);
+  const paramContext = findParameterContextInFunctionBody(
+    node,
+    functionDef,
+    functionRegistry,
+    schemaLoader
+  );
   if (paramContext) {
     return paramContext;
   }
 
   const paramVariable = findParameterVariable(node, functionDef);
   if (paramVariable) {
-    const paramTypes = getParameterTypes(functionDef, paramVariable.index, functionRegistry);
+    const paramTypes = getParameterTypes(
+      functionDef,
+      paramVariable.index,
+      functionRegistry
+    );
 
     if (paramTypes.length > 0) {
       const firstType = schemaLoader.getType(paramTypes[0]);
@@ -549,13 +588,20 @@ export function inferTypeContextInFunctionBody(
     }
   }
 
-  const accessExpr = findAncestorOfType(node, ['access_expression', 'subscript_expression']);
+  const accessExpr = findAncestorOfType(node, [
+    "access_expression",
+    "subscript_expression",
+  ]);
   if (accessExpr) {
-    const baseNode = getFieldNode(accessExpr, 'base');
-    if (baseNode?.type === 'variable') {
+    const baseNode = getFieldNode(accessExpr, "base");
+    if (baseNode?.type === "variable") {
       const paramMatch = findParameterByName(baseNode.text, functionDef);
       if (paramMatch !== null) {
-        const paramTypes = getParameterTypes(functionDef, paramMatch, functionRegistry);
+        const paramTypes = getParameterTypes(
+          functionDef,
+          paramMatch,
+          functionRegistry
+        );
 
         if (paramTypes.length > 0) {
           const firstType = schemaLoader.getType(paramTypes[0]);
@@ -580,22 +626,29 @@ function findParameterContextInFunctionBody(
 ): InferredContext | null {
   // Look for projection ancestor, then find the base expression
   // Note: if node IS the projection, use it; otherwise look for ancestor
-  const projection = node.type === 'projection' ? node : findAncestorOfType(node, ['projection']);
+  const projection =
+    node.type === "projection"
+      ? node
+      : findAncestorOfType(node, ["projection"]);
   if (!projection || !projection.parent) return null;
 
   const projExpr = projection.parent;
-  if (projExpr.type !== 'projection_expression') return null;
+  if (projExpr.type !== "projection_expression") return null;
 
-  const baseNode = getFieldNode(projExpr, 'base');
+  const baseNode = getFieldNode(projExpr, "base");
   if (!baseNode) return null;
 
   // Handle $ref[] pattern - subscript on variable
-  if (baseNode.type === 'subscript_expression') {
-    const subscriptBase = getFieldNode(baseNode, 'base');
-    if (subscriptBase?.type === 'variable') {
+  if (baseNode.type === "subscript_expression") {
+    const subscriptBase = getFieldNode(baseNode, "base");
+    if (subscriptBase?.type === "variable") {
       const paramIndex = findParameterByName(subscriptBase.text, functionDef);
       if (paramIndex !== null) {
-        const paramTypes = getParameterTypes(functionDef, paramIndex, functionRegistry);
+        const paramTypes = getParameterTypes(
+          functionDef,
+          paramIndex,
+          functionRegistry
+        );
 
         if (paramTypes.length > 0) {
           const firstType = schemaLoader.getType(paramTypes[0]);
@@ -613,12 +666,16 @@ function findParameterContextInFunctionBody(
   }
 
   // Handle $ref-> pattern - dereference on variable
-  if (baseNode.type === 'dereference_expression') {
-    const derefBase = getFieldNode(baseNode, 'base');
-    if (derefBase?.type === 'variable') {
+  if (baseNode.type === "dereference_expression") {
+    const derefBase = getFieldNode(baseNode, "base");
+    if (derefBase?.type === "variable") {
       const paramIndex = findParameterByName(derefBase.text, functionDef);
       if (paramIndex !== null) {
-        const paramTypes = getParameterTypes(functionDef, paramIndex, functionRegistry);
+        const paramTypes = getParameterTypes(
+          functionDef,
+          paramIndex,
+          functionRegistry
+        );
 
         if (paramTypes.length > 0) {
           const firstType = schemaLoader.getType(paramTypes[0]);
@@ -636,10 +693,14 @@ function findParameterContextInFunctionBody(
   }
 
   // Handle direct $ref { } pattern
-  if (baseNode.type === 'variable') {
+  if (baseNode.type === "variable") {
     const paramIndex = findParameterByName(baseNode.text, functionDef);
     if (paramIndex !== null) {
-      const paramTypes = getParameterTypes(functionDef, paramIndex, functionRegistry);
+      const paramTypes = getParameterTypes(
+        functionDef,
+        paramIndex,
+        functionRegistry
+      );
 
       if (paramTypes.length > 0) {
         const firstType = schemaLoader.getType(paramTypes[0]);
@@ -662,7 +723,7 @@ function findParameterVariable(
   node: SyntaxNode,
   functionDef: FunctionDefinition
 ): { name: string; index: number } | null {
-  if (node.type === 'variable') {
+  if (node.type === "variable") {
     const paramIndex = findParameterByName(node.text, functionDef);
     if (paramIndex !== null) {
       return { name: node.text, index: paramIndex };
@@ -671,16 +732,19 @@ function findParameterVariable(
 
   let current: SyntaxNode | null = node;
   while (current) {
-    if (current.type === 'variable') {
+    if (current.type === "variable") {
       const paramIndex = findParameterByName(current.text, functionDef);
       if (paramIndex !== null) {
         return { name: current.text, index: paramIndex };
       }
     }
 
-    if (current.type === 'subscript_expression' || current.type === 'access_expression') {
-      const baseNode = getFieldNode(current, 'base');
-      if (baseNode?.type === 'variable') {
+    if (
+      current.type === "subscript_expression" ||
+      current.type === "access_expression"
+    ) {
+      const baseNode = getFieldNode(current, "base");
+      if (baseNode?.type === "variable") {
         const paramIndex = findParameterByName(baseNode.text, functionDef);
         if (paramIndex !== null) {
           return { name: baseNode.text, index: paramIndex };
@@ -694,7 +758,10 @@ function findParameterVariable(
   return null;
 }
 
-function findParameterByName(name: string, functionDef: FunctionDefinition): number | null {
+function findParameterByName(
+  name: string,
+  functionDef: FunctionDefinition
+): number | null {
   for (let i = 0; i < functionDef.parameters.length; i++) {
     if (functionDef.parameters[i].name === name) {
       return i;
@@ -716,18 +783,22 @@ function finalizeContextInFunctionBody(
   node: SyntaxNode,
   schemaLoader: SchemaLoader
 ): InferredContext {
-  const accessExpr = findAncestorOfType(node, ['access_expression', 'dereference_expression']);
+  const accessExpr = findAncestorOfType(node, [
+    "access_expression",
+    "dereference_expression",
+  ]);
   if (accessExpr && context.type) {
-    const memberNode = getFieldNode(accessExpr, 'member');
+    const memberNode = getFieldNode(accessExpr, "member");
     if (memberNode) {
-      context.field = schemaLoader.getField(context.type.name, memberNode.text) ?? null;
+      context.field =
+        schemaLoader.getField(context.type.name, memberNode.text) ?? null;
     }
   }
 
-  const subscriptExpr = findAncestorOfType(node, 'subscript_expression');
+  const subscriptExpr = findAncestorOfType(node, "subscript_expression");
   if (subscriptExpr) {
-    const baseNode = getFieldNode(subscriptExpr, 'base');
-    if (baseNode?.type === 'variable') {
+    const baseNode = getFieldNode(subscriptExpr, "base");
+    if (baseNode?.type === "variable") {
       context.isArray = true;
     }
   }

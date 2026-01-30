@@ -23,19 +23,14 @@
           "type": "array",
           "title": "Content",
           "description": "The main content blocks",
-          "of": [
-            { "type": "block" },
-            { "type": "image" }
-          ]
+          "of": [{ "type": "block" }, { "type": "image" }]
         },
         {
           "name": "author",
           "type": "reference",
           "title": "Author",
           "description": "The post author",
-          "to": [
-            { "type": "author" }
-          ]
+          "to": [{ "type": "author" }]
         },
         {
           "name": "categories",

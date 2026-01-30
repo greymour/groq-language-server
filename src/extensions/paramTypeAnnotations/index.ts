@@ -1,6 +1,6 @@
-import type { Extension } from '../index';
-import { parseParamAnnotations } from './parser';
-import { validateParamTypes } from './diagnostics';
+import type { Extension } from "../index";
+import { parseParamAnnotations } from "./parser";
+import { validateParamTypes } from "./diagnostics";
 
 /**
  * Extension that enables JSDoc-style parameter type annotations for GROQ functions.
@@ -17,9 +17,10 @@ import { validateParamTypes } from './diagnostics';
  * - Type information shown in hover documentation
  */
 export const paramTypeAnnotationsExtension: Extension = {
-  id: 'paramTypeAnnotations',
-  name: 'Parameter Type Annotations',
-  description: 'Enables // @param {type} $name syntax for typing GROQ function parameters',
+  id: "paramTypeAnnotations",
+  name: "Parameter Type Annotations",
+  description:
+    "Enables // @param {type} $name syntax for typing GROQ function parameters",
 
   hooks: {
     onFunctionExtracted: (funcDef, rawSource, funcStartIndex) => {
@@ -45,5 +46,5 @@ export const paramTypeAnnotationsExtension: Extension = {
   },
 };
 
-export { parseParamAnnotations } from './parser';
-export { validateParamTypes } from './diagnostics';
+export { parseParamAnnotations } from "./parser";
+export { validateParamTypes } from "./diagnostics";

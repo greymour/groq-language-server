@@ -46,18 +46,19 @@ export function parseParamAnnotations(
   const beforeFunc = rawSource.slice(0, funcStartIndex);
 
   // Pattern: // @param {typeName} $paramName OR // @param {typeName[]} $paramName
-  const regex = /\/\/\s*@param\s*\{([_A-Za-z][_0-9A-Za-z]*)(\[\])?\}\s*(\$[_A-Za-z][_0-9A-Za-z]*)/g;
+  const regex =
+    /\/\/\s*@param\s*\{([_A-Za-z][_0-9A-Za-z]*)(\[\])?\}\s*(\$[_A-Za-z][_0-9A-Za-z]*)/g;
 
   // Only look at the last contiguous block of // comments before the function
-  const lines = beforeFunc.split('\n');
+  const lines = beforeFunc.split("\n");
   let commentBlockStart = -1;
 
   // Find the start of the comment block immediately before function
   for (let i = lines.length - 1; i >= 0; i--) {
     const trimmed = lines[i].trim();
-    if (trimmed.startsWith('//')) {
+    if (trimmed.startsWith("//")) {
       commentBlockStart = i;
-    } else if (trimmed === '') {
+    } else if (trimmed === "") {
       // Empty line - continue looking
       continue;
     } else {
@@ -74,16 +75,16 @@ export function parseParamAnnotations(
     blockStartOffset += lines[i].length + 1; // +1 for newline
   }
 
-  const commentBlock = lines.slice(commentBlockStart).join('\n');
+  const commentBlock = lines.slice(commentBlockStart).join("\n");
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(commentBlock)) !== null) {
     const typeName = match[1];
-    const isArray = match[2] === '[]';
+    const isArray = match[2] === "[]";
     const paramName = match[3];
 
     // Calculate the range of the type name within the source
-    const typeStartInBlock = match.index + match[0].indexOf('{') + 1;
+    const typeStartInBlock = match.index + match[0].indexOf("{") + 1;
     const typeEndInBlock = typeStartInBlock + typeName.length;
 
     annotations.set(paramName, {

@@ -1,32 +1,36 @@
-import type { Diagnostic } from 'vscode-languageserver';
-import { DiagnosticSeverity } from 'vscode-languageserver';
-import type { ParseResult, SyntaxNode } from '../parser/ASTTypes';
-import { nodeToRange } from '../parser/ASTTypes';
-import { toLSPRange } from '../utils/Range';
-import { walkTree, findAncestorOfType, getFieldNode } from '../parser/nodeUtils';
-import type { SchemaLoader } from '../schema/SchemaLoader';
-import { getAvailableFields } from '../schema/TypeInference';
-import { resolveTypeContext } from '../schema/TypeContextResolver';
-import { FunctionRegistry } from '../schema/FunctionRegistry';
-import type { ExtensionRegistry } from '../extensions/index';
+import type { Diagnostic } from "vscode-languageserver";
+import { DiagnosticSeverity } from "vscode-languageserver";
+import type { ParseResult, SyntaxNode } from "../parser/ASTTypes";
+import { nodeToRange } from "../parser/ASTTypes";
+import { toLSPRange } from "../utils/Range";
+import {
+  walkTree,
+  findAncestorOfType,
+  getFieldNode,
+} from "../parser/nodeUtils";
+import type { SchemaLoader } from "../schema/SchemaLoader";
+import { getAvailableFields } from "../schema/TypeInference";
+import { resolveTypeContext } from "../schema/TypeContextResolver";
+import { FunctionRegistry } from "../schema/FunctionRegistry";
+import type { ExtensionRegistry } from "../extensions/index";
 
 const PRIMITIVE_TYPES = new Set([
-  'string',
-  'number',
-  'boolean',
-  'text',
-  'datetime',
-  'date',
-  'url',
+  "string",
+  "number",
+  "boolean",
+  "text",
+  "datetime",
+  "date",
+  "url",
 ]);
 
 const BUILT_IN_FIELD_TYPES: Record<string, string> = {
-  '_id': 'string',
-  '_type': 'string',
-  '_rev': 'string',
-  '_createdAt': 'datetime',
-  '_updatedAt': 'datetime',
-  '_key': 'string',
+  _id: "string",
+  _type: "string",
+  _rev: "string",
+  _createdAt: "datetime",
+  _updatedAt: "datetime",
+  _key: "string",
 };
 
 function getBuiltInFieldType(fieldName: string): string | undefined {
@@ -46,7 +50,12 @@ export function getDiagnostics(
   const { schemaLoader, source, extensionRegistry } = options;
 
   const functionRegistry = new FunctionRegistry();
-  functionRegistry.extractFromAST(parseResult.tree.rootNode, schemaLoader, source, extensionRegistry);
+  functionRegistry.extractFromAST(
+    parseResult.tree.rootNode,
+    schemaLoader,
+    source,
+    extensionRegistry
+  );
 
   const validators: Array<() => Diagnostic[]> = [
     () => collectSyntaxErrors(parseResult),
@@ -58,21 +67,37 @@ export function getDiagnostics(
 
   if (schemaLoader?.isLoaded() && source) {
     validators.push(
-      () => collectExtensionDiagnostics(extensionRegistry, functionRegistry, schemaLoader, source),
-      () => validateFieldReferences(parseResult.tree.rootNode, schemaLoader, functionRegistry),
-      () => validatePrimitiveProjections(parseResult.tree.rootNode, schemaLoader, functionRegistry),
+      () =>
+        collectExtensionDiagnostics(
+          extensionRegistry,
+          functionRegistry,
+          schemaLoader,
+          source
+        ),
+      () =>
+        validateFieldReferences(
+          parseResult.tree.rootNode,
+          schemaLoader,
+          functionRegistry
+        ),
+      () =>
+        validatePrimitiveProjections(
+          parseResult.tree.rootNode,
+          schemaLoader,
+          functionRegistry
+        )
     );
   }
 
-  return validators.flatMap(validate => validate());
+  return validators.flatMap((validate) => validate());
 }
 
 function collectSyntaxErrors(parseResult: ParseResult): Diagnostic[] {
-  return parseResult.errors.map(error => ({
+  return parseResult.errors.map((error) => ({
     severity: DiagnosticSeverity.Error,
     range: toLSPRange(error.range),
     message: error.message,
-    source: 'groq',
+    source: "groq",
   }));
 }
 
@@ -84,7 +109,7 @@ function collectExtensionDiagnostics(
 ): Diagnostic[] {
   if (!extensionRegistry) return [];
 
-  const hooks = extensionRegistry.getHook('getDiagnostics');
+  const hooks = extensionRegistry.getHook("getDiagnostics");
   return hooks.flatMap(({ hook }) =>
     hook({
       functionDefinitions: functionRegistry.getAllDefinitions(),
@@ -103,49 +128,52 @@ function validateFieldReferences(
   const checkedNodes = new Set<number>();
 
   walkTree(root, (node) => {
-    if (node.type !== 'identifier') return;
+    if (node.type !== "identifier") return;
     if (checkedNodes.has(node.id)) return;
     checkedNodes.add(node.id);
 
     const fieldName = node.text;
 
     // Skip built-in fields and special identifiers
-    if (fieldName.startsWith('_') || fieldName.startsWith('$')) return;
+    if (fieldName.startsWith("_") || fieldName.startsWith("$")) return;
 
     // Skip if this is a key in a key-value pair (aliased field)
     const parent = node.parent;
-    if (parent?.type === 'pair') {
-      const keyNode = parent.childForFieldName('key');
+    if (parent?.type === "pair") {
+      const keyNode = parent.childForFieldName("key");
       if (keyNode?.id === node.id) return;
     }
 
     // Skip function names (both built-in and custom)
-    if (parent?.type === 'function_call') {
-      const funcNode = parent.childForFieldName('function');
+    if (parent?.type === "function_call") {
+      const funcNode = parent.childForFieldName("function");
       if (funcNode?.id === node.id) return;
-      const nameNode = parent.childForFieldName('name');
+      const nameNode = parent.childForFieldName("name");
       if (nameNode?.id === node.id) return;
     }
 
     // Skip custom function definition names
-    if (parent?.type === 'function_definition') {
-      const nameNode = parent.childForFieldName('name');
+    if (parent?.type === "function_definition") {
+      const nameNode = parent.childForFieldName("name");
       if (nameNode?.id === node.id) return;
     }
 
     // Skip namespaced identifiers (custom function calls like custom::getLinkTitles)
-    if (parent?.type === 'namespaced_identifier') return;
+    if (parent?.type === "namespaced_identifier") return;
 
     // Only validate identifiers inside projections
-    const projection = findAncestorOfType(node, ['projection']);
+    const projection = findAncestorOfType(node, ["projection"]);
     if (!projection) return;
 
-    const context = resolveTypeContext(node, { schemaLoader, functionRegistry });
+    const context = resolveTypeContext(node, {
+      schemaLoader,
+      functionRegistry,
+    });
     if (!context?.type) return;
 
     // Get available fields for this type
     const availableFields = getAvailableFields(context, schemaLoader);
-    const fieldNames = new Set(availableFields.map(f => f.name));
+    const fieldNames = new Set(availableFields.map((f) => f.name));
 
     // Check if the field exists
     if (!fieldNames.has(fieldName)) {
@@ -153,7 +181,7 @@ function validateFieldReferences(
         severity: DiagnosticSeverity.Warning,
         range: toLSPRange(nodeToRange(node)),
         message: `Field "${fieldName}" does not exist on type "${context.type.name}"`,
-        source: 'groq',
+        source: "groq",
       });
     }
   });
@@ -170,36 +198,39 @@ function validatePrimitiveProjections(
   const checkedNodes = new Set<number>();
 
   walkTree(root, (node) => {
-    if (node.type !== 'projection_expression') return;
+    if (node.type !== "projection_expression") return;
     if (checkedNodes.has(node.id)) return;
     checkedNodes.add(node.id);
 
     // Get the base of the projection_expression
-    const baseNode = getFieldNode(node, 'base');
-    if (!baseNode || baseNode.type !== 'identifier') return;
+    const baseNode = getFieldNode(node, "base");
+    if (!baseNode || baseNode.type !== "identifier") return;
 
     const fieldName = baseNode.text;
 
     // Check built-in fields directly - they're all primitives
-    if (fieldName.startsWith('_')) {
+    if (fieldName.startsWith("_")) {
       const builtInType = getBuiltInFieldType(fieldName);
       if (builtInType && PRIMITIVE_TYPES.has(builtInType)) {
-        const projectionNode = getFieldNode(node, 'projection');
+        const projectionNode = getFieldNode(node, "projection");
         diagnostics.push({
           severity: DiagnosticSeverity.Error,
           range: toLSPRange(nodeToRange(projectionNode ?? node)),
           message: `Cannot project on primitive type "${builtInType}" (field "${fieldName}")`,
-          source: 'groq',
+          source: "groq",
         });
       }
       return;
     }
 
     // Find the parent type context to look up this field
-    const parentProjection = findAncestorOfType(node, ['projection']);
+    const parentProjection = findAncestorOfType(node, ["projection"]);
     if (!parentProjection) return;
 
-    const context = resolveTypeContext(parentProjection, { schemaLoader, functionRegistry });
+    const context = resolveTypeContext(parentProjection, {
+      schemaLoader,
+      functionRegistry,
+    });
     if (!context?.type) return;
 
     // Look up the field in the parent type
@@ -208,12 +239,12 @@ function validatePrimitiveProjections(
 
     // Check if the field type is primitive
     if (PRIMITIVE_TYPES.has(field.type)) {
-      const projectionNode = getFieldNode(node, 'projection');
+      const projectionNode = getFieldNode(node, "projection");
       diagnostics.push({
         severity: DiagnosticSeverity.Error,
         range: toLSPRange(nodeToRange(projectionNode ?? node)),
         message: `Cannot project on primitive type "${field.type}" (field "${fieldName}")`,
-        source: 'groq',
+        source: "groq",
       });
     }
   });
@@ -228,9 +259,9 @@ function validateNoRecursion(
   const diagnostics: Diagnostic[] = [];
 
   walkTree(root, (node) => {
-    if (node.type !== 'function_call') return;
+    if (node.type !== "function_call") return;
 
-    const nameNode = getFieldNode(node, 'name');
+    const nameNode = getFieldNode(node, "name");
     if (!nameNode) return;
 
     const calledFuncName = nameNode.text;
@@ -245,7 +276,7 @@ function validateNoRecursion(
         severity: DiagnosticSeverity.Error,
         range: toLSPRange(nodeToRange(nameNode)),
         message: `Recursive function calls are not supported in GROQ`,
-        source: 'groq',
+        source: "groq",
       });
     }
   });
@@ -257,19 +288,21 @@ function validateSingleParameter(root: SyntaxNode): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   walkTree(root, (node) => {
-    if (node.type !== 'function_definition') return;
+    if (node.type !== "function_definition") return;
 
-    const paramListNode = node.children.find(c => c.type === 'parameter_list');
+    const paramListNode = node.children.find(
+      (c) => c.type === "parameter_list"
+    );
     if (!paramListNode) return;
 
-    const params = paramListNode.children.filter(c => c.type === 'variable');
+    const params = paramListNode.children.filter((c) => c.type === "variable");
     if (params.length > 1) {
-      const nameNode = getFieldNode(node, 'name');
+      const nameNode = getFieldNode(node, "name");
       diagnostics.push({
         severity: DiagnosticSeverity.Error,
         range: toLSPRange(nodeToRange(paramListNode)),
-        message: `GROQ functions can only have one parameter. Function "${nameNode?.text ?? 'unknown'}" has ${params.length} parameters.`,
-        source: 'groq',
+        message: `GROQ functions can only have one parameter. Function "${nameNode?.text ?? "unknown"}" has ${params.length} parameters.`,
+        source: "groq",
       });
     }
   });
@@ -281,22 +314,24 @@ function validateSingleParameterUsage(root: SyntaxNode): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   walkTree(root, (node) => {
-    if (node.type !== 'function_definition') return;
+    if (node.type !== "function_definition") return;
 
-    const nameNode = getFieldNode(node, 'name');
-    const paramListNode = node.children.find(c => c.type === 'parameter_list');
-    const bodyNode = getFieldNode(node, 'body');
+    const nameNode = getFieldNode(node, "name");
+    const paramListNode = node.children.find(
+      (c) => c.type === "parameter_list"
+    );
+    const bodyNode = getFieldNode(node, "body");
 
     if (!paramListNode || !bodyNode) return;
 
-    const params = paramListNode.children.filter(c => c.type === 'variable');
+    const params = paramListNode.children.filter((c) => c.type === "variable");
 
     for (const param of params) {
       const paramName = param.text;
       const usages: SyntaxNode[] = [];
 
       walkTree(bodyNode, (bodyChild) => {
-        if (bodyChild.type === 'variable' && bodyChild.text === paramName) {
+        if (bodyChild.type === "variable" && bodyChild.text === paramName) {
           usages.push(bodyChild);
         }
       });
@@ -306,8 +341,8 @@ function validateSingleParameterUsage(root: SyntaxNode): Diagnostic[] {
           diagnostics.push({
             severity: DiagnosticSeverity.Error,
             range: toLSPRange(nodeToRange(usage)),
-            message: `Parameter "${paramName}" can only be used once in function "${nameNode?.text ?? 'unknown'}".`,
-            source: 'groq',
+            message: `Parameter "${paramName}" can only be used once in function "${nameNode?.text ?? "unknown"}".`,
+            source: "groq",
           });
         }
       }
@@ -321,20 +356,20 @@ function validateNoParentScope(root: SyntaxNode): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   walkTree(root, (node) => {
-    if (node.type !== 'function_definition') return;
+    if (node.type !== "function_definition") return;
 
-    const nameNode = getFieldNode(node, 'name');
-    const bodyNode = getFieldNode(node, 'body');
+    const nameNode = getFieldNode(node, "name");
+    const bodyNode = getFieldNode(node, "body");
 
     if (!bodyNode) return;
 
     walkTree(bodyNode, (bodyChild) => {
-      if (bodyChild.type === 'parent') {
+      if (bodyChild.type === "parent") {
         diagnostics.push({
           severity: DiagnosticSeverity.Error,
           range: toLSPRange(nodeToRange(bodyChild)),
-          message: `Parent scope operator "^" cannot be used in function "${nameNode?.text ?? 'unknown'}".`,
-          source: 'groq',
+          message: `Parent scope operator "^" cannot be used in function "${nameNode?.text ?? "unknown"}".`,
+          source: "groq",
         });
       }
     });
@@ -342,4 +377,3 @@ function validateNoParentScope(root: SyntaxNode): Diagnostic[] {
 
   return diagnostics;
 }
-

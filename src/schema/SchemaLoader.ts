@@ -1,8 +1,19 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as crypto from 'node:crypto';
-import type { SanitySchema, SchemaType, ResolvedType, ResolvedField } from './SchemaTypes';
-import { isDocumentType, isReferenceField, isArrayField, getReferenceTargets, getArrayItemTypes } from './SchemaTypes';
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as crypto from "node:crypto";
+import type {
+  SanitySchema,
+  SchemaType,
+  ResolvedType,
+  ResolvedField,
+} from "./SchemaTypes";
+import {
+  isDocumentType,
+  isReferenceField,
+  isArrayField,
+  getReferenceTargets,
+  getArrayItemTypes,
+} from "./SchemaTypes";
 
 export interface SchemaValidationConfig {
   enabled?: boolean;
@@ -67,7 +78,10 @@ export class SchemaLoader {
   private lastValidationError: string | null = null;
 
   constructor(validationConfig?: SchemaValidationConfig) {
-    this.validationConfig = { ...DEFAULT_VALIDATION_CONFIG, ...validationConfig };
+    this.validationConfig = {
+      ...DEFAULT_VALIDATION_CONFIG,
+      ...validationConfig,
+    };
   }
 
   updateValidationConfig(config: SchemaValidationConfig): void {
@@ -90,7 +104,7 @@ export class SchemaLoader {
         return false;
       }
 
-      const content = fs.readFileSync(absolutePath, 'utf-8');
+      const content = fs.readFileSync(absolutePath, "utf-8");
       const parsed = JSON.parse(content);
 
       if (this.validationConfig.enabled) {
@@ -104,7 +118,7 @@ export class SchemaLoader {
 
         if (cachedResult) {
           if (!cachedResult.valid) {
-            const errorMsg = cachedResult.error ?? 'Schema validation failed';
+            const errorMsg = cachedResult.error ?? "Schema validation failed";
             this.lastValidationError = `${errorMsg} (cached)`;
             this.schema = null;
             this.rawSchema = null;
@@ -115,11 +129,17 @@ export class SchemaLoader {
           const validation = this.validateSchema(parsed);
 
           if (this.validationConfig.cacheValidation) {
-            this.writeValidationCache(cachePath, schemaHash, configHash, validation);
+            this.writeValidationCache(
+              cachePath,
+              schemaHash,
+              configHash,
+              validation
+            );
           }
 
           if (!validation.valid) {
-            this.lastValidationError = validation.error ?? 'Schema validation failed';
+            this.lastValidationError =
+              validation.error ?? "Schema validation failed";
             this.schema = null;
             this.rawSchema = null;
             this.resolvedTypes.clear();
@@ -142,7 +162,7 @@ export class SchemaLoader {
   }
 
   private computeHash(content: string): string {
-    return crypto.createHash('sha256').update(content).digest('hex');
+    return crypto.createHash("sha256").update(content).digest("hex");
   }
 
   private computeConfigHash(): string {
@@ -151,12 +171,16 @@ export class SchemaLoader {
       maxTypes: this.validationConfig.maxTypes,
       maxFieldsPerType: this.validationConfig.maxFieldsPerType,
     });
-    return crypto.createHash('sha256').update(configString).digest('hex');
+    return crypto.createHash("sha256").update(configString).digest("hex");
   }
 
   private getCachePath(schemaPath: string): string {
-    const schemaPathHash = crypto.createHash('sha256').update(schemaPath).digest('hex').slice(0, 16);
-    const cacheDir = path.join(__dirname, '..', '.cache');
+    const schemaPathHash = crypto
+      .createHash("sha256")
+      .update(schemaPath)
+      .digest("hex")
+      .slice(0, 16);
+    const cacheDir = path.join(__dirname, "..", ".cache");
 
     if (!fs.existsSync(cacheDir)) {
       fs.mkdirSync(cacheDir, { recursive: true });
@@ -175,7 +199,7 @@ export class SchemaLoader {
         return null;
       }
 
-      const cacheContent = fs.readFileSync(cachePath, 'utf-8');
+      const cacheContent = fs.readFileSync(cachePath, "utf-8");
       const cache = JSON.parse(cacheContent) as ValidationCacheEntry;
 
       if (
@@ -206,7 +230,7 @@ export class SchemaLoader {
         valid: result.valid,
         error: result.error,
       };
-      fs.writeFileSync(cachePath, JSON.stringify(cache), 'utf-8');
+      fs.writeFileSync(cachePath, JSON.stringify(cache), "utf-8");
     } catch {
       // Silently fail - caching is an optimization, not critical
     }
@@ -243,27 +267,41 @@ export class SchemaLoader {
     }
   }
 
-  private isGroqTypeSchema(raw: unknown): raw is GroqTypeSchema[] | Record<string, GroqTypeSchema> {
+  private isGroqTypeSchema(
+    raw: unknown
+  ): raw is GroqTypeSchema[] | Record<string, GroqTypeSchema> {
     if (Array.isArray(raw) && raw.length > 0) {
       const first = raw[0];
-      return typeof first === 'object' && first !== null && 'name' in first &&
-             ('attributes' in first || ('value' in first && typeof first.value === 'object'));
+      return (
+        typeof first === "object" &&
+        first !== null &&
+        "name" in first &&
+        ("attributes" in first ||
+          ("value" in first && typeof first.value === "object"))
+      );
     }
-    if (typeof raw === 'object' && raw !== null && !('types' in raw)) {
+    if (typeof raw === "object" && raw !== null && !("types" in raw)) {
       const values = Object.values(raw);
       if (values.length > 0) {
         const first = values[0] as Record<string, unknown>;
-        return typeof first === 'object' && first !== null && 'name' in first;
+        return typeof first === "object" && first !== null && "name" in first;
       }
     }
     return false;
   }
 
   private isSanitySchema(raw: unknown): raw is SanitySchema {
-    return typeof raw === 'object' && raw !== null && 'types' in raw && Array.isArray((raw as SanitySchema).types);
+    return (
+      typeof raw === "object" &&
+      raw !== null &&
+      "types" in raw &&
+      Array.isArray((raw as SanitySchema).types)
+    );
   }
 
-  private resolveGroqTypeSchema(raw: GroqTypeSchema[] | Record<string, GroqTypeSchema>): void {
+  private resolveGroqTypeSchema(
+    raw: GroqTypeSchema[] | Record<string, GroqTypeSchema>
+  ): void {
     const types = Array.isArray(raw) ? raw : Object.values(raw);
 
     for (const schemaType of types) {
@@ -276,12 +314,12 @@ export class SchemaLoader {
 
   private resolveGroqType(schemaType: GroqTypeSchema): ResolvedType | null {
     const fields = new Map<string, ResolvedField>();
-    const isDocument = schemaType.type === 'document';
+    const isDocument = schemaType.type === "document";
 
     const attributes = schemaType.attributes || schemaType.value?.attributes;
     if (attributes) {
       for (const [fieldName, attr] of Object.entries(attributes)) {
-        if (attr.type !== 'objectAttribute') continue;
+        if (attr.type !== "objectAttribute") continue;
 
         const resolvedField = this.resolveGroqAttribute(fieldName, attr);
         fields.set(fieldName, resolvedField);
@@ -295,7 +333,10 @@ export class SchemaLoader {
     };
   }
 
-  private resolveGroqAttribute(name: string, attr: GroqAttribute): ResolvedField {
+  private resolveGroqAttribute(
+    name: string,
+    attr: GroqAttribute
+  ): ResolvedField {
     const value = attr.value;
     let type = value.type;
     let isReference = false;
@@ -303,15 +344,15 @@ export class SchemaLoader {
     let isArray = false;
     let arrayOf: string[] | undefined;
 
-    if (value.type === 'reference' && value.to) {
+    if (value.type === "reference" && value.to) {
       isReference = true;
-      referenceTargets = value.to.map(t => t.type);
-      type = 'reference';
-    } else if (value.type === 'array' && value.of) {
+      referenceTargets = value.to.map((t) => t.type);
+      type = "reference";
+    } else if (value.type === "array" && value.of) {
       isArray = true;
-      if (value.of.type === 'inline' && value.of.name) {
+      if (value.of.type === "inline" && value.of.name) {
         arrayOf = [value.of.name];
-      } else if (value.of.type === 'object') {
+      } else if (value.of.type === "object") {
         const ofObj = value.of as unknown as { rest?: { name?: string } };
         if (ofObj.rest?.name) {
           arrayOf = [ofObj.rest.name];
@@ -321,8 +362,8 @@ export class SchemaLoader {
       } else {
         arrayOf = [value.of.type];
       }
-      type = 'array';
-    } else if (value.type === 'inline' && value.name) {
+      type = "array";
+    } else if (value.type === "inline" && value.name) {
       type = value.name;
     }
 
@@ -356,7 +397,9 @@ export class SchemaLoader {
           name: field.name,
           type: field.type,
           isReference: isReferenceField(field),
-          referenceTargets: isReferenceField(field) ? getReferenceTargets(field) : undefined,
+          referenceTargets: isReferenceField(field)
+            ? getReferenceTargets(field)
+            : undefined,
           isArray: isArrayField(field),
           arrayOf: isArrayField(field) ? getArrayItemTypes(field) : undefined,
           description: field.description,
@@ -366,11 +409,36 @@ export class SchemaLoader {
     }
 
     if (isDocumentType(schemaType)) {
-      fields.set('_id', { name: '_id', type: 'string', isReference: false, isArray: false });
-      fields.set('_type', { name: '_type', type: 'string', isReference: false, isArray: false });
-      fields.set('_createdAt', { name: '_createdAt', type: 'datetime', isReference: false, isArray: false });
-      fields.set('_updatedAt', { name: '_updatedAt', type: 'datetime', isReference: false, isArray: false });
-      fields.set('_rev', { name: '_rev', type: 'string', isReference: false, isArray: false });
+      fields.set("_id", {
+        name: "_id",
+        type: "string",
+        isReference: false,
+        isArray: false,
+      });
+      fields.set("_type", {
+        name: "_type",
+        type: "string",
+        isReference: false,
+        isArray: false,
+      });
+      fields.set("_createdAt", {
+        name: "_createdAt",
+        type: "datetime",
+        isReference: false,
+        isArray: false,
+      });
+      fields.set("_updatedAt", {
+        name: "_updatedAt",
+        type: "datetime",
+        isReference: false,
+        isArray: false,
+      });
+      fields.set("_rev", {
+        name: "_rev",
+        type: "string",
+        isReference: false,
+        isArray: false,
+      });
     }
 
     return {
@@ -394,7 +462,10 @@ export class SchemaLoader {
     return { valid: true };
   }
 
-  private checkDepth(value: unknown, currentDepth: number): SchemaValidationResult {
+  private checkDepth(
+    value: unknown,
+    currentDepth: number
+  ): SchemaValidationResult {
     if (currentDepth > this.validationConfig.maxDepth) {
       return {
         valid: false,
@@ -407,9 +478,12 @@ export class SchemaLoader {
         const result = this.checkDepth(item, currentDepth + 1);
         if (!result.valid) return result;
       }
-    } else if (value !== null && typeof value === 'object') {
+    } else if (value !== null && typeof value === "object") {
       for (const key of Object.keys(value)) {
-        const result = this.checkDepth((value as Record<string, unknown>)[key], currentDepth + 1);
+        const result = this.checkDepth(
+          (value as Record<string, unknown>)[key],
+          currentDepth + 1
+        );
         if (!result.valid) return result;
       }
     }
@@ -426,7 +500,7 @@ export class SchemaLoader {
 
     return {
       valid: false,
-      error: 'Schema does not match expected Sanity or GROQ type schema format',
+      error: "Schema does not match expected Sanity or GROQ type schema format",
     };
   }
 
@@ -443,11 +517,17 @@ export class SchemaLoader {
     }
 
     for (const schemaType of types) {
-      if (typeof schemaType.name !== 'string' || schemaType.name.length === 0) {
-        return { valid: false, error: 'Schema type missing required "name" field' };
+      if (typeof schemaType.name !== "string" || schemaType.name.length === 0) {
+        return {
+          valid: false,
+          error: 'Schema type missing required "name" field',
+        };
       }
-      if (typeof schemaType.type !== 'string') {
-        return { valid: false, error: `Schema type "${schemaType.name}" missing required "type" field` };
+      if (typeof schemaType.type !== "string") {
+        return {
+          valid: false,
+          error: `Schema type "${schemaType.name}" missing required "type" field`,
+        };
       }
 
       const attributes = schemaType.attributes || schemaType.value?.attributes;
@@ -465,7 +545,9 @@ export class SchemaLoader {
     return { valid: true };
   }
 
-  private validateSanitySchemaStructure(schema: SanitySchema): SchemaValidationResult {
+  private validateSanitySchemaStructure(
+    schema: SanitySchema
+  ): SchemaValidationResult {
     if (!Array.isArray(schema.types)) {
       return { valid: false, error: 'Sanity schema "types" must be an array' };
     }
@@ -478,16 +560,25 @@ export class SchemaLoader {
     }
 
     for (const schemaType of schema.types) {
-      if (typeof schemaType.name !== 'string' || schemaType.name.length === 0) {
-        return { valid: false, error: 'Schema type missing required "name" field' };
+      if (typeof schemaType.name !== "string" || schemaType.name.length === 0) {
+        return {
+          valid: false,
+          error: 'Schema type missing required "name" field',
+        };
       }
-      if (typeof schemaType.type !== 'string') {
-        return { valid: false, error: `Schema type "${schemaType.name}" missing required "type" field` };
+      if (typeof schemaType.type !== "string") {
+        return {
+          valid: false,
+          error: `Schema type "${schemaType.name}" missing required "type" field`,
+        };
       }
 
       if (schemaType.fields) {
         if (!Array.isArray(schemaType.fields)) {
-          return { valid: false, error: `Type "${schemaType.name}" has invalid "fields" (must be an array)` };
+          return {
+            valid: false,
+            error: `Type "${schemaType.name}" has invalid "fields" (must be an array)`,
+          };
         }
         if (schemaType.fields.length > this.validationConfig.maxFieldsPerType) {
           return {
@@ -497,11 +588,17 @@ export class SchemaLoader {
         }
 
         for (const field of schemaType.fields) {
-          if (typeof field.name !== 'string' || field.name.length === 0) {
-            return { valid: false, error: `Field in type "${schemaType.name}" missing required "name"` };
+          if (typeof field.name !== "string" || field.name.length === 0) {
+            return {
+              valid: false,
+              error: `Field in type "${schemaType.name}" missing required "name"`,
+            };
           }
-          if (typeof field.type !== 'string') {
-            return { valid: false, error: `Field "${field.name}" in type "${schemaType.name}" missing required "type"` };
+          if (typeof field.type !== "string") {
+            return {
+              valid: false,
+              error: `Field "${field.name}" in type "${schemaType.name}" missing required "type"`,
+            };
           }
         }
       }

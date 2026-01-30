@@ -1,8 +1,8 @@
-import type { Position, Range } from '../parser/ASTTypes';
-import type { EmbeddedQuery, InterpolationRange } from './findGroqTags';
-import { findGroqTags } from './findGroqTags';
-import { createRangeMapper } from './RangeMapping';
-import { rangesOverlap, positionInRange } from '../utils/Range';
+import type { Position, Range } from "../parser/ASTTypes";
+import type { EmbeddedQuery, InterpolationRange } from "./findGroqTags";
+import { findGroqTags } from "./findGroqTags";
+import { createRangeMapper } from "./RangeMapping";
+import { rangesOverlap, positionInRange } from "../utils/Range";
 
 export class EmbeddedLanguageHandler {
   private cache: Map<string, EmbeddedQuery[]> = new Map();
@@ -22,7 +22,7 @@ export class EmbeddedLanguageHandler {
   getQueryAtPosition(uri: string, position: Position): EmbeddedQuery | null {
     const queries = this.cache.get(uri);
     if (!queries) return null;
-    return queries.find(q => positionInRange(position, q.range)) ?? null;
+    return queries.find((q) => positionInRange(position, q.range)) ?? null;
   }
 
   toEmbeddedPosition(query: EmbeddedQuery, position: Position): Position {
@@ -37,8 +37,8 @@ export class EmbeddedLanguageHandler {
     items: T[],
     interpolationRanges: InterpolationRange[]
   ): T[] {
-    return items.filter(item =>
-      !interpolationRanges.some(ir => rangesOverlap(item.range, ir))
+    return items.filter(
+      (item) => !interpolationRanges.some((ir) => rangesOverlap(item.range, ir))
     );
   }
 
@@ -47,7 +47,7 @@ export class EmbeddedLanguageHandler {
     items: T[]
   ): T[] {
     const mapper = createRangeMapper(query.range.start);
-    return items.map(item => ({
+    return items.map((item) => ({
       ...item,
       range: mapper.toDocumentRange(item.range),
     }));

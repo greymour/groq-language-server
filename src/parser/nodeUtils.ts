@@ -1,4 +1,4 @@
-import type { SyntaxNode, Position, GroqNodeType } from './ASTTypes';
+import type { SyntaxNode, Position, GroqNodeType } from "./ASTTypes";
 
 export function getNodeAtPosition(
   root: SyntaxNode,
@@ -59,10 +59,7 @@ export function getFieldNode(
   return node.childForFieldName(fieldName);
 }
 
-export function isInsideNode(
-  position: Position,
-  node: SyntaxNode
-): boolean {
+export function isInsideNode(position: Position, node: SyntaxNode): boolean {
   const startPos = node.startPosition;
   const endPos = node.endPosition;
 
@@ -113,7 +110,7 @@ export function findAllNodesOfType(
 export function findFirstErrorNode(root: SyntaxNode): SyntaxNode | null {
   let errorNode: SyntaxNode | null = null;
   walkTree(root, (node) => {
-    if (node.type === 'ERROR' || node.isMissing) {
+    if (node.type === "ERROR" || node.isMissing) {
       errorNode = node;
       return false;
     }
@@ -125,7 +122,7 @@ export function findFirstErrorNode(root: SyntaxNode): SyntaxNode | null {
 export function collectAllErrors(root: SyntaxNode): SyntaxNode[] {
   const errors: SyntaxNode[] = [];
   walkTree(root, (node) => {
-    if (node.type === 'ERROR' || node.isMissing) {
+    if (node.type === "ERROR" || node.isMissing) {
       errors.push(node);
     }
   });
@@ -152,14 +149,19 @@ export function getNodeText(node: SyntaxNode): string {
   return node.text;
 }
 
-export function containsPosition(node: SyntaxNode, position: Position): boolean {
+export function containsPosition(
+  node: SyntaxNode,
+  position: Position
+): boolean {
   const start = node.startPosition;
   const end = node.endPosition;
 
   if (position.line < start.row) return false;
   if (position.line > end.row) return false;
-  if (position.line === start.row && position.character < start.column) return false;
-  if (position.line === end.row && position.character > end.column) return false;
+  if (position.line === start.row && position.character < start.column)
+    return false;
+  if (position.line === end.row && position.character > end.column)
+    return false;
 
   return true;
 }

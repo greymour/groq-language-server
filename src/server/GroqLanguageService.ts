@@ -1,4 +1,4 @@
-import type { TextDocument } from 'vscode-languageserver-textdocument';
+import type { TextDocument } from "vscode-languageserver-textdocument";
 import type {
   CompletionItem,
   Diagnostic,
@@ -6,17 +6,20 @@ import type {
   Position,
   SymbolInformation,
   Location,
-} from 'vscode-languageserver';
-import { DocumentCache } from './DocumentCache';
-import { getDiagnostics } from '../interface/getDiagnostics';
-import { getAutocompleteSuggestions } from '../interface/getAutocompleteSuggestions';
-import { getHoverInformation } from '../interface/getHoverInformation';
-import { getOutline } from '../interface/getOutline';
-import { getDefinition } from '../interface/getDefinition';
-import { EmbeddedLanguageHandler } from '../embedded/EmbeddedLanguageHandler';
-import { SchemaLoader } from '../schema/SchemaLoader';
-import type { SchemaValidationConfig } from '../schema/SchemaLoader';
-import { ExtensionRegistry, paramTypeAnnotationsExtension } from '../extensions/index';
+} from "vscode-languageserver";
+import { DocumentCache } from "./DocumentCache";
+import { getDiagnostics } from "../interface/getDiagnostics";
+import { getAutocompleteSuggestions } from "../interface/getAutocompleteSuggestions";
+import { getHoverInformation } from "../interface/getHoverInformation";
+import { getOutline } from "../interface/getOutline";
+import { getDefinition } from "../interface/getDefinition";
+import { EmbeddedLanguageHandler } from "../embedded/EmbeddedLanguageHandler";
+import { SchemaLoader } from "../schema/SchemaLoader";
+import type { SchemaValidationConfig } from "../schema/SchemaLoader";
+import {
+  ExtensionRegistry,
+  paramTypeAnnotationsExtension,
+} from "../extensions/index";
 
 export type { SchemaValidationConfig };
 
@@ -50,13 +53,15 @@ export class GroqLanguageService {
     }
   }
 
-  private createExtensionRegistry(extensionsConfig?: ExtensionsConfig): ExtensionRegistry {
+  private createExtensionRegistry(
+    extensionsConfig?: ExtensionsConfig
+  ): ExtensionRegistry {
     const registry = new ExtensionRegistry();
 
     registry.register(paramTypeAnnotationsExtension);
 
     if (extensionsConfig?.paramTypeAnnotations) {
-      registry.enable('paramTypeAnnotations');
+      registry.enable("paramTypeAnnotations");
     }
 
     return registry;
@@ -138,9 +143,21 @@ export class GroqLanguageService {
     const parseResult = this.documentCache.getParseResult(document.uri);
     if (!parseResult) {
       const result = this.documentCache.set(document);
-      return getHoverInformation(document.getText(), result.tree.rootNode, position, this.schemaLoader, this.extensionRegistry);
+      return getHoverInformation(
+        document.getText(),
+        result.tree.rootNode,
+        position,
+        this.schemaLoader,
+        this.extensionRegistry
+      );
     }
-    return getHoverInformation(document.getText(), parseResult.tree.rootNode, position, this.schemaLoader, this.extensionRegistry);
+    return getHoverInformation(
+      document.getText(),
+      parseResult.tree.rootNode,
+      position,
+      this.schemaLoader,
+      this.extensionRegistry
+    );
   }
 
   getDocumentSymbols(document: TextDocument): SymbolInformation[] {
@@ -164,9 +181,19 @@ export class GroqLanguageService {
     const parseResult = this.documentCache.getParseResult(document.uri);
     if (!parseResult) {
       const result = this.documentCache.set(document);
-      return getDefinition(document.getText(), result.tree.rootNode, position, document.uri);
+      return getDefinition(
+        document.getText(),
+        result.tree.rootNode,
+        position,
+        document.uri
+      );
     }
-    return getDefinition(document.getText(), parseResult.tree.rootNode, position, document.uri);
+    return getDefinition(
+      document.getText(),
+      parseResult.tree.rootNode,
+      position,
+      document.uri
+    );
   }
 
   private isEmbeddedLanguage(uri: string): boolean {
@@ -180,7 +207,7 @@ export class GroqLanguageService {
       return this.getEmbeddedDiagnostics(document);
     }
 
-    return queries.flatMap(query => {
+    return queries.flatMap((query) => {
       const diagnostics = getDiagnostics(query.parseResult, {
         schemaLoader: this.schemaLoader,
         source: query.content,
@@ -194,11 +221,20 @@ export class GroqLanguageService {
     });
   }
 
-  private getEmbeddedCompletions(document: TextDocument, position: Position): CompletionItem[] {
-    const query = this.embeddedHandler.getQueryAtPosition(document.uri, position);
+  private getEmbeddedCompletions(
+    document: TextDocument,
+    position: Position
+  ): CompletionItem[] {
+    const query = this.embeddedHandler.getQueryAtPosition(
+      document.uri,
+      position
+    );
     if (!query) return [];
 
-    const embeddedPosition = this.embeddedHandler.toEmbeddedPosition(query, position);
+    const embeddedPosition = this.embeddedHandler.toEmbeddedPosition(
+      query,
+      position
+    );
     return getAutocompleteSuggestions(
       query.content,
       query.parseResult.tree.rootNode,
@@ -208,12 +244,27 @@ export class GroqLanguageService {
     );
   }
 
-  private getEmbeddedHover(document: TextDocument, position: Position): Hover | null {
-    const query = this.embeddedHandler.getQueryAtPosition(document.uri, position);
+  private getEmbeddedHover(
+    document: TextDocument,
+    position: Position
+  ): Hover | null {
+    const query = this.embeddedHandler.getQueryAtPosition(
+      document.uri,
+      position
+    );
     if (!query) return null;
 
-    const embeddedPosition = this.embeddedHandler.toEmbeddedPosition(query, position);
-    const hover = getHoverInformation(query.content, query.parseResult.tree.rootNode, embeddedPosition, this.schemaLoader, this.extensionRegistry);
+    const embeddedPosition = this.embeddedHandler.toEmbeddedPosition(
+      query,
+      position
+    );
+    const hover = getHoverInformation(
+      query.content,
+      query.parseResult.tree.rootNode,
+      embeddedPosition,
+      this.schemaLoader,
+      this.extensionRegistry
+    );
     if (hover?.range) {
       hover.range = this.embeddedHandler.toDocumentRange(query, hover.range);
     }
@@ -222,26 +273,46 @@ export class GroqLanguageService {
 
   private getEmbeddedSymbols(document: TextDocument): SymbolInformation[] {
     const queries = this.embeddedHandler.getQueries(document.uri);
-    return queries.flatMap(query => {
+    return queries.flatMap((query) => {
       const symbols = getOutline(query.parseResult.tree.rootNode, document.uri);
-      return symbols.map(symbol => ({
+      return symbols.map((symbol) => ({
         ...symbol,
         location: {
           ...symbol.location,
-          range: this.embeddedHandler.toDocumentRange(query, symbol.location.range),
+          range: this.embeddedHandler.toDocumentRange(
+            query,
+            symbol.location.range
+          ),
         },
       }));
     });
   }
 
-  private getEmbeddedDefinition(document: TextDocument, position: Position): Location | null {
-    const query = this.embeddedHandler.getQueryAtPosition(document.uri, position);
+  private getEmbeddedDefinition(
+    document: TextDocument,
+    position: Position
+  ): Location | null {
+    const query = this.embeddedHandler.getQueryAtPosition(
+      document.uri,
+      position
+    );
     if (!query) return null;
 
-    const embeddedPosition = this.embeddedHandler.toEmbeddedPosition(query, position);
-    const location = getDefinition(query.content, query.parseResult.tree.rootNode, embeddedPosition, document.uri);
+    const embeddedPosition = this.embeddedHandler.toEmbeddedPosition(
+      query,
+      position
+    );
+    const location = getDefinition(
+      query.content,
+      query.parseResult.tree.rootNode,
+      embeddedPosition,
+      document.uri
+    );
     if (location) {
-      location.range = this.embeddedHandler.toDocumentRange(query, location.range);
+      location.range = this.embeddedHandler.toDocumentRange(
+        query,
+        location.range
+      );
     }
     return location;
   }

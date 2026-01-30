@@ -1,4 +1,4 @@
-import type { Position, Range } from '../parser/ASTTypes';
+import type { Position, Range } from "../parser/ASTTypes";
 
 export interface RangeMapper {
   toEmbedded(position: Position): Position;
@@ -58,4 +58,3 @@ export function adjustPositionForEmbedded(
   const mapper = createRangeMapper(embeddedStart);
   return mapper.toDocument(position);
 }
-

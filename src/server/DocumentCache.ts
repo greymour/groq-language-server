@@ -1,6 +1,6 @@
-import type { TextDocument } from 'vscode-languageserver-textdocument';
-import type { ParseResult, Tree } from '../parser/ASTTypes';
-import { getSharedParser } from '../parser/GroqParser';
+import type { TextDocument } from "vscode-languageserver-textdocument";
+import type { ParseResult, Tree } from "../parser/ASTTypes";
+import { getSharedParser } from "../parser/GroqParser";
 
 interface CachedDocument {
   document: TextDocument;

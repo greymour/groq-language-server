@@ -1,93 +1,93 @@
-import type Parser from 'tree-sitter';
+import type Parser from "tree-sitter";
 
 export type SyntaxNode = Parser.SyntaxNode;
 export type Tree = Parser.Tree;
 export type Point = Parser.Point;
 
 export type GroqNodeType =
-  | 'source_file'
-  | 'identifier'
-  | 'variable'
-  | 'this'
-  | 'parent'
-  | 'everything'
-  | 'null'
-  | 'true'
-  | 'false'
-  | 'number'
-  | 'string'
-  | 'double_quoted_string'
-  | 'single_quoted_string'
-  | 'escape_sequence'
-  | 'parenthesized_expression'
-  | 'unary_expression'
-  | 'not_expression'
-  | 'binary_expression'
-  | 'and_expression'
-  | 'or_expression'
-  | 'comparison_expression'
-  | 'in_expression'
-  | 'match_expression'
-  | 'pipe_expression'
-  | 'access_expression'
-  | 'subscript_expression'
-  | 'dereference_expression'
-  | 'projection_expression'
-  | 'projection'
-  | 'projection_pair'
-  | 'spread'
-  | 'pair'
-  | 'asc_expression'
-  | 'desc_expression'
-  | 'array'
-  | 'object'
-  | 'object_pair'
-  | 'function_call'
-  | 'function_definition'
-  | 'parameter_list'
-  | 'namespaced_identifier'
-  | 'comment'
-  | 'ERROR';
+  | "source_file"
+  | "identifier"
+  | "variable"
+  | "this"
+  | "parent"
+  | "everything"
+  | "null"
+  | "true"
+  | "false"
+  | "number"
+  | "string"
+  | "double_quoted_string"
+  | "single_quoted_string"
+  | "escape_sequence"
+  | "parenthesized_expression"
+  | "unary_expression"
+  | "not_expression"
+  | "binary_expression"
+  | "and_expression"
+  | "or_expression"
+  | "comparison_expression"
+  | "in_expression"
+  | "match_expression"
+  | "pipe_expression"
+  | "access_expression"
+  | "subscript_expression"
+  | "dereference_expression"
+  | "projection_expression"
+  | "projection"
+  | "projection_pair"
+  | "spread"
+  | "pair"
+  | "asc_expression"
+  | "desc_expression"
+  | "array"
+  | "object"
+  | "object_pair"
+  | "function_call"
+  | "function_definition"
+  | "parameter_list"
+  | "namespaced_identifier"
+  | "comment"
+  | "ERROR";
 
 export const EXPRESSION_TYPES: ReadonlySet<GroqNodeType> = new Set([
-  'identifier',
-  'variable',
-  'this',
-  'parent',
-  'everything',
-  'null',
-  'true',
-  'false',
-  'number',
-  'string',
-  'parenthesized_expression',
-  'unary_expression',
-  'not_expression',
-  'binary_expression',
-  'and_expression',
-  'or_expression',
-  'comparison_expression',
-  'in_expression',
-  'match_expression',
-  'pipe_expression',
-  'access_expression',
-  'subscript_expression',
-  'dereference_expression',
-  'projection_expression',
-  'pair',
-  'asc_expression',
-  'desc_expression',
-  'array',
-  'object',
-  'function_call',
+  "identifier",
+  "variable",
+  "this",
+  "parent",
+  "everything",
+  "null",
+  "true",
+  "false",
+  "number",
+  "string",
+  "parenthesized_expression",
+  "unary_expression",
+  "not_expression",
+  "binary_expression",
+  "and_expression",
+  "or_expression",
+  "comparison_expression",
+  "in_expression",
+  "match_expression",
+  "pipe_expression",
+  "access_expression",
+  "subscript_expression",
+  "dereference_expression",
+  "projection_expression",
+  "pair",
+  "asc_expression",
+  "desc_expression",
+  "array",
+  "object",
+  "function_call",
 ]);
 
 export const LITERAL_TYPES: ReadonlySet<GroqNodeType> = new Set([
-  'null',
-  'true',
-  'false',
-  'number',
-  'string',
+  "null",
+  "true",
+  "false",
+  "number",
+  "string",
 ]);
 
 export interface Position {

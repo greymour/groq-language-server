@@ -47,11 +47,11 @@ export interface ResolvedField {
 }
 
 export function isDocumentType(schemaType: SchemaType): boolean {
-  return schemaType.type === 'document';
+  return schemaType.type === "document";
 }
 
 export function isObjectType(schemaType: SchemaType): boolean {
-  return schemaType.type === 'object';
+  return schemaType.type === "object";
 }
 
 export function getFieldType(field: SchemaField): string {
@@ -59,11 +59,11 @@ export function getFieldType(field: SchemaField): string {
 }
 
 export function isReferenceField(field: SchemaField): boolean {
-  return field.type === 'reference';
+  return field.type === "reference";
 }
 
 export function isArrayField(field: SchemaField): boolean {
-  return field.type === 'array';
+  return field.type === "array";
 }
 
 export function getReferenceTargets(field: SchemaField): string[] {

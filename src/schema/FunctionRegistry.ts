@@ -1,8 +1,12 @@
-import type { SyntaxNode } from '../parser/ASTTypes';
-import { walkTree, getFieldNode, findAncestorOfType } from '../parser/nodeUtils';
-import type { SchemaLoader } from './SchemaLoader';
-import { inferTypeContext } from './TypeInference';
-import type { ExtensionRegistry } from '../extensions/index';
+import type { SyntaxNode } from "../parser/ASTTypes";
+import {
+  walkTree,
+  getFieldNode,
+  findAncestorOfType,
+} from "../parser/nodeUtils";
+import type { SchemaLoader } from "./SchemaLoader";
+import { inferTypeContext } from "./TypeInference";
+import type { ExtensionRegistry } from "../extensions/index";
 
 export interface FunctionParameter {
   name: string;
@@ -29,7 +33,7 @@ export class FunctionRegistry {
   private definitions: Map<string, FunctionDefinition> = new Map();
   private callSites: Map<string, CallSiteInfo[]> = new Map();
   private visitedFunctions: Set<string> = new Set();
-  private rawSource: string = '';
+  private rawSource: string = "";
   private extensionRegistry: ExtensionRegistry | null = null;
 
   clear(): void {
@@ -45,7 +49,7 @@ export class FunctionRegistry {
     extensionRegistry?: ExtensionRegistry
   ): void {
     this.clear();
-    this.rawSource = rawSource ?? '';
+    this.rawSource = rawSource ?? "";
     this.extensionRegistry = extensionRegistry ?? null;
     this.extractFunctionDefinitions(root);
     this.extractCallSites(root, schemaLoader);
@@ -54,14 +58,16 @@ export class FunctionRegistry {
 
   private extractFunctionDefinitions(root: SyntaxNode): void {
     walkTree(root, (node) => {
-      if (node.type !== 'function_definition') return;
+      if (node.type !== "function_definition") return;
 
-      const nameNode = getFieldNode(node, 'name');
+      const nameNode = getFieldNode(node, "name");
       if (!nameNode) return;
 
       const funcName = nameNode.text;
-      const paramListNode = node.children.find(c => c.type === 'parameter_list');
-      const bodyNode = getFieldNode(node, 'body');
+      const paramListNode = node.children.find(
+        (c) => c.type === "parameter_list"
+      );
+      const bodyNode = getFieldNode(node, "body");
 
       if (!bodyNode) return;
 
@@ -69,7 +75,7 @@ export class FunctionRegistry {
       if (paramListNode) {
         for (let i = 0; i < paramListNode.childCount; i++) {
           const child = paramListNode.child(i);
-          if (child?.type === 'variable') {
+          if (child?.type === "variable") {
             parameters.push({
               name: child.text,
               inferredTypes: new Set(),
@@ -90,7 +96,7 @@ export class FunctionRegistry {
 
       // Call extension hooks to augment the function definition
       if (this.extensionRegistry) {
-        const hooks = this.extensionRegistry.getHook('onFunctionExtracted');
+        const hooks = this.extensionRegistry.getHook("onFunctionExtracted");
         for (const { hook } of hooks) {
           hook(funcDef, this.rawSource, node.startIndex);
         }
@@ -100,11 +106,14 @@ export class FunctionRegistry {
     });
   }
 
-  private extractCallSites(root: SyntaxNode, schemaLoader?: SchemaLoader): void {
+  private extractCallSites(
+    root: SyntaxNode,
+    schemaLoader?: SchemaLoader
+  ): void {
     walkTree(root, (node) => {
-      if (node.type !== 'function_call') return;
+      if (node.type !== "function_call") return;
 
-      const nameNode = getFieldNode(node, 'name');
+      const nameNode = getFieldNode(node, "name");
       if (!nameNode) return;
 
       const funcName = nameNode.text;
@@ -135,10 +144,13 @@ export class FunctionRegistry {
     });
   }
 
-  private inferArgumentType(argNode: SyntaxNode, schemaLoader?: SchemaLoader): string[] | null {
+  private inferArgumentType(
+    argNode: SyntaxNode,
+    schemaLoader?: SchemaLoader
+  ): string[] | null {
     if (!schemaLoader?.isLoaded()) return null;
 
-    if (argNode.type === 'identifier') {
+    if (argNode.type === "identifier") {
       const fieldName = argNode.text;
       const context = inferTypeContext(argNode, schemaLoader);
 
@@ -151,7 +163,7 @@ export class FunctionRegistry {
           if (field.isReference && field.referenceTargets?.length) {
             return field.referenceTargets;
           }
-          if (field.type !== 'object') {
+          if (field.type !== "object") {
             return [field.type];
           }
         }
@@ -166,16 +178,16 @@ export class FunctionRegistry {
           if (field.isReference && field.referenceTargets?.length) {
             return field.referenceTargets;
           }
-          if (field.type !== 'object') {
+          if (field.type !== "object") {
             return [field.type];
           }
         }
       }
     }
 
-    if (argNode.type === 'subscript_expression') {
-      const baseNode = getFieldNode(argNode, 'base');
-      if (baseNode?.type === 'identifier') {
+    if (argNode.type === "subscript_expression") {
+      const baseNode = getFieldNode(argNode, "base");
+      if (baseNode?.type === "identifier") {
         const fieldName = baseNode.text;
         const context = inferTypeContext(argNode, schemaLoader);
 
@@ -195,7 +207,10 @@ export class FunctionRegistry {
       }
     }
 
-    if (argNode.type === 'access_expression' || argNode.type === 'dereference_expression') {
+    if (
+      argNode.type === "access_expression" ||
+      argNode.type === "dereference_expression"
+    ) {
       const context = inferTypeContext(argNode, schemaLoader);
       if (context.type) {
         return [context.type.name];
@@ -252,7 +267,7 @@ export class FunctionRegistry {
 
     // Check extensions for declared type
     if (this.extensionRegistry) {
-      const hooks = this.extensionRegistry.getHook('getParameterType');
+      const hooks = this.extensionRegistry.getHook("getParameterType");
       for (const { hook } of hooks) {
         const declaredType = hook(definition, param, paramIndex);
         if (declaredType) {
@@ -265,27 +280,33 @@ export class FunctionRegistry {
     return Array.from(param.inferredTypes);
   }
 
-  getParameterByName(funcName: string, paramName: string): FunctionParameter | undefined {
+  getParameterByName(
+    funcName: string,
+    paramName: string
+  ): FunctionParameter | undefined {
     const definition = this.definitions.get(funcName);
     if (!definition) return undefined;
-    return definition.parameters.find(p => p.name === paramName);
+    return definition.parameters.find((p) => p.name === paramName);
   }
 
   isInsideFunctionBody(node: SyntaxNode): FunctionDefinition | null {
-    const funcDef = findAncestorOfType(node, 'function_definition');
+    const funcDef = findAncestorOfType(node, "function_definition");
     if (!funcDef) return null;
 
-    const nameNode = getFieldNode(funcDef, 'name');
+    const nameNode = getFieldNode(funcDef, "name");
     if (!nameNode) return null;
 
     return this.definitions.get(nameNode.text) ?? null;
   }
 
-  findFunctionCallByName(root: SyntaxNode, funcName: string): SyntaxNode | null {
+  findFunctionCallByName(
+    root: SyntaxNode,
+    funcName: string
+  ): SyntaxNode | null {
     let found: SyntaxNode | null = null;
     walkTree(root, (node) => {
-      if (node.type === 'function_call') {
-        const nameNode = getFieldNode(node, 'name');
+      if (node.type === "function_call") {
+        const nameNode = getFieldNode(node, "name");
         if (nameNode?.text === funcName) {
           found = node;
           return false;
@@ -296,11 +317,14 @@ export class FunctionRegistry {
     return found;
   }
 
-  findFunctionDefinitionNode(root: SyntaxNode, funcName: string): SyntaxNode | null {
+  findFunctionDefinitionNode(
+    root: SyntaxNode,
+    funcName: string
+  ): SyntaxNode | null {
     let found: SyntaxNode | null = null;
     walkTree(root, (node) => {
-      if (node.type === 'function_definition') {
-        const nameNode = getFieldNode(node, 'name');
+      if (node.type === "function_definition") {
+        const nameNode = getFieldNode(node, "name");
         if (nameNode?.text === funcName) {
           found = node;
           return false;

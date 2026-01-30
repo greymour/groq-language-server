@@ -1,11 +1,11 @@
-import type { Position } from '../parser/ASTTypes';
+import type { Position } from "../parser/ASTTypes";
 
 export function offsetToPosition(text: string, offset: number): Position {
   let line = 0;
   let character = 0;
 
   for (let i = 0; i < offset && i < text.length; i++) {
-    if (text[i] === '\n') {
+    if (text[i] === "\n") {
       line++;
       character = 0;
     } else {
@@ -24,7 +24,7 @@ export function positionToOffset(text: string, position: Position): number {
     if (currentLine === position.line) {
       return offset + position.character;
     }
-    if (text[i] === '\n') {
+    if (text[i] === "\n") {
       currentLine++;
     }
     offset++;
@@ -38,16 +38,19 @@ export function positionToOffset(text: string, position: Position): number {
 }
 
 export function getLineText(text: string, line: number): string {
-  const lines = text.split('\n');
-  return lines[line] ?? '';
+  const lines = text.split("\n");
+  return lines[line] ?? "";
 }
 
-export function getCharacterBeforePosition(text: string, position: Position): string {
+export function getCharacterBeforePosition(
+  text: string,
+  position: Position
+): string {
   const lineText = getLineText(text, position.line);
   if (position.character > 0) {
-    return lineText[position.character - 1] ?? '';
+    return lineText[position.character - 1] ?? "";
   }
-  return '';
+  return "";
 }
 
 export function getWordAtPosition(text: string, position: Position): string {
@@ -55,8 +58,8 @@ export function getWordAtPosition(text: string, position: Position): string {
   const before = lineText.slice(0, position.character);
   const after = lineText.slice(position.character);
 
-  const wordBefore = before.match(/[_A-Za-z$][_0-9A-Za-z]*$/)?.[0] ?? '';
-  const wordAfter = after.match(/^[_0-9A-Za-z]*/)?.[0] ?? '';
+  const wordBefore = before.match(/[_A-Za-z$][_0-9A-Za-z]*$/)?.[0] ?? "";
+  const wordAfter = after.match(/^[_0-9A-Za-z]*/)?.[0] ?? "";
 
   return wordBefore + wordAfter;
 }
@@ -69,16 +72,22 @@ export function getWordRangeAtPosition(
   const before = lineText.slice(0, position.character);
   const after = lineText.slice(position.character);
 
-  const wordBefore = before.match(/[_A-Za-z$][_0-9A-Za-z]*$/)?.[0] ?? '';
-  const wordAfter = after.match(/^[_0-9A-Za-z]*/)?.[0] ?? '';
+  const wordBefore = before.match(/[_A-Za-z$][_0-9A-Za-z]*$/)?.[0] ?? "";
+  const wordAfter = after.match(/^[_0-9A-Za-z]*/)?.[0] ?? "";
 
   if (!wordBefore && !wordAfter) {
     return null;
   }
 
   return {
-    start: { line: position.line, character: position.character - wordBefore.length },
-    end: { line: position.line, character: position.character + wordAfter.length },
+    start: {
+      line: position.line,
+      character: position.character - wordBefore.length,
+    },
+    end: {
+      line: position.line,
+      character: position.character + wordAfter.length,
+    },
   };
 }
 
@@ -101,12 +110,17 @@ export function positionEquals(a: Position, b: Position): boolean {
   return a.line === b.line && a.character === b.character;
 }
 
-export function getNamespacePrefixAtPosition(text: string, position: Position): string | null {
+export function getNamespacePrefixAtPosition(
+  text: string,
+  position: Position
+): string | null {
   const lineText = getLineText(text, position.line);
   const before = lineText.slice(0, position.character);
 
   // Match patterns like "custom::" or "geo::" at the end
-  const namespaceMatch = before.match(/([_A-Za-z][_0-9A-Za-z]*)::([_A-Za-z][_0-9A-Za-z]*)?$/);
+  const namespaceMatch = before.match(
+    /([_A-Za-z][_0-9A-Za-z]*)::([_A-Za-z][_0-9A-Za-z]*)?$/
+  );
   if (namespaceMatch) {
     return namespaceMatch[1];
   }

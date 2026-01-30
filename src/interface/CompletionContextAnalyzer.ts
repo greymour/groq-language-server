@@ -1,19 +1,28 @@
-import type { Position } from 'vscode-languageserver';
-import type { SyntaxNode } from '../parser/ASTTypes';
-import { getNodeAtPosition, findAncestorOfType, getFieldNode } from '../parser/nodeUtils';
-import { getCharacterBeforePosition, getWordAtPosition, getNamespacePrefixAtPosition, positionToOffset } from '../utils/positionUtils';
+import type { Position } from "vscode-languageserver";
+import type { SyntaxNode } from "../parser/ASTTypes";
+import {
+  getNodeAtPosition,
+  findAncestorOfType,
+  getFieldNode,
+} from "../parser/nodeUtils";
+import {
+  getCharacterBeforePosition,
+  getWordAtPosition,
+  getNamespacePrefixAtPosition,
+  positionToOffset,
+} from "../utils/positionUtils";
 
 export type CompletionContext =
-  | 'empty'
-  | 'afterEverything'
-  | 'insideFilter'
-  | 'insideProjection'
-  | 'afterDot'
-  | 'afterArrow'
-  | 'afterPipe'
-  | 'functionArgs'
-  | 'orderArgs'
-  | 'general';
+  | "empty"
+  | "afterEverything"
+  | "insideFilter"
+  | "insideProjection"
+  | "afterDot"
+  | "afterArrow"
+  | "afterPipe"
+  | "functionArgs"
+  | "orderArgs"
+  | "general";
 
 export interface AnalyzedContext {
   context: CompletionContext;
@@ -48,58 +57,66 @@ function determineContext(
   charBefore: string,
   node: SyntaxNode | null
 ): CompletionContext {
-  if (source.trim() === '') return 'empty';
+  if (source.trim() === "") return "empty";
 
   const charContexts: Partial<Record<string, CompletionContext>> = {
-    '.': 'afterDot',
-    '|': 'afterPipe',
-    '[': 'insideFilter',
-    '{': 'insideProjection',
-    '*': 'afterEverything',
+    ".": "afterDot",
+    "|": "afterPipe",
+    "[": "insideFilter",
+    "{": "insideProjection",
+    "*": "afterEverything",
   };
 
   if (charBefore in charContexts) {
     return charContexts[charBefore]!;
   }
 
-  if (source.slice(-2) === '->') return 'afterArrow';
-  if (source.trim() === '*') return 'afterEverything';
+  if (source.slice(-2) === "->") return "afterArrow";
+  if (source.trim() === "*") return "afterEverything";
 
-  const textBeforeCursor = source.substring(0, positionToOffset(source, position));
-  if (isInsideUnclosedBracket(textBeforeCursor)) return 'insideFilter';
-  if (isInsideUnclosedBrace(textBeforeCursor)) return 'insideProjection';
+  const textBeforeCursor = source.substring(
+    0,
+    positionToOffset(source, position)
+  );
+  if (isInsideUnclosedBracket(textBeforeCursor)) return "insideFilter";
+  if (isInsideUnclosedBrace(textBeforeCursor)) return "insideProjection";
 
   if (node) {
-    if (node.type === 'everything') return 'afterEverything';
+    if (node.type === "everything") return "afterEverything";
 
-    const subscriptAncestor = findAncestorOfType(node, 'subscript_expression');
+    const subscriptAncestor = findAncestorOfType(node, "subscript_expression");
     if (subscriptAncestor) {
-      const baseField = getFieldNode(subscriptAncestor, 'base');
+      const baseField = getFieldNode(subscriptAncestor, "base");
       if (baseField && node.startIndex > baseField.endIndex) {
-        return 'insideFilter';
+        return "insideFilter";
       }
     }
 
-    const projectionAncestor = findAncestorOfType(node, ['projection', 'projection_expression']);
-    if (projectionAncestor) return 'insideProjection';
+    const projectionAncestor = findAncestorOfType(node, [
+      "projection",
+      "projection_expression",
+    ]);
+    if (projectionAncestor) return "insideProjection";
 
-    const functionCallAncestor = findAncestorOfType(node, 'function_call');
+    const functionCallAncestor = findAncestorOfType(node, "function_call");
     if (functionCallAncestor) {
-      const nameNode = getFieldNode(functionCallAncestor, 'name');
-      if (nameNode?.text === 'order') return 'orderArgs';
-      return 'functionArgs';
+      const nameNode = getFieldNode(functionCallAncestor, "name");
+      if (nameNode?.text === "order") return "orderArgs";
+      return "functionArgs";
     }
   }
 
-  return 'general';
+  return "general";
 }
 
 function isInsideUnclosedBracket(text: string): boolean {
-  return countUnmatched(text, '[', ']') > 0 && countUnmatched(text, '{', '}') === 0;
+  return (
+    countUnmatched(text, "[", "]") > 0 && countUnmatched(text, "{", "}") === 0
+  );
 }
 
 function isInsideUnclosedBrace(text: string): boolean {
-  return countUnmatched(text, '{', '}') > 0;
+  return countUnmatched(text, "{", "}") > 0;
 }
 
 function countUnmatched(text: string, open: string, close: string): number {

@@ -9,9 +9,9 @@ import type {
   DidOpenTextDocumentParams,
   DidChangeTextDocumentParams,
   DidCloseTextDocumentParams,
-} from 'vscode-languageserver';
-import { TextDocument } from 'vscode-languageserver-textdocument';
-import { GroqLanguageService } from './GroqLanguageService';
+} from "vscode-languageserver";
+import { TextDocument } from "vscode-languageserver-textdocument";
+import { GroqLanguageService } from "./GroqLanguageService";
 
 export class MessageProcessor {
   private connection: Connection;
@@ -39,20 +39,22 @@ export class MessageProcessor {
   }
 
   private handleInitialize(params: InitializeParams): InitializeResult {
-    const initOptions = params.initializationOptions as {
-      schemaPath?: string;
-      schemaEnabled?: boolean;
-      extensions?: {
-        paramTypeAnnotations?: boolean;
-      };
-      schemaValidation?: {
-        enabled?: boolean;
-        maxDepth?: number;
-        maxTypes?: number;
-        maxFieldsPerType?: number;
-        cacheValidation?: boolean;
-      };
-    } | undefined;
+    const initOptions = params.initializationOptions as
+      | {
+          schemaPath?: string;
+          schemaEnabled?: boolean;
+          extensions?: {
+            paramTypeAnnotations?: boolean;
+          };
+          schemaValidation?: {
+            enabled?: boolean;
+            maxDepth?: number;
+            maxTypes?: number;
+            maxFieldsPerType?: number;
+            cacheValidation?: boolean;
+          };
+        }
+      | undefined;
 
     if (initOptions) {
       this.service.updateConfig({
@@ -67,7 +69,7 @@ export class MessageProcessor {
         textDocumentSync: 1 as TextDocumentSyncKind,
         completionProvider: {
           resolveProvider: false,
-          triggerCharacters: ['.', '[', '{', '|', '-', '*', '@', '^', '$', '('],
+          triggerCharacters: [".", "[", "{", "|", "-", "*", "@", "^", "$", "("],
         },
         hoverProvider: true,
         documentSymbolProvider: true,

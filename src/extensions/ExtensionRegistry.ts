@@ -1,4 +1,4 @@
-import type { Extension, ExtensionConfig, Hooks } from './index';
+import type { Extension, ExtensionConfig, Hooks } from "./index";
 
 /**
  * Manages registration and lifecycle of extensions.
@@ -63,7 +63,7 @@ export class ExtensionRegistry {
    * Get all enabled extensions.
    */
   getEnabledExtensions(): Extension[] {
-    return this.getAllExtensions().filter(ext => this.isEnabled(ext.id));
+    return this.getAllExtensions().filter((ext) => this.isEnabled(ext.id));
   }
 
   /**
@@ -73,7 +73,8 @@ export class ExtensionRegistry {
   getHook<K extends keyof Hooks>(
     hookName: K
   ): Array<{ extension: Extension; hook: NonNullable<Hooks[K]> }> {
-    const result: Array<{ extension: Extension; hook: NonNullable<Hooks[K]> }> = [];
+    const result: Array<{ extension: Extension; hook: NonNullable<Hooks[K]> }> =
+      [];
 
     for (const extension of this.getEnabledExtensions()) {
       const hook = extension.hooks[hookName];

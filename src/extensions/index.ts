@@ -1,6 +1,9 @@
-import type { Diagnostic } from 'vscode-languageserver';
-import type { FunctionDefinition, FunctionParameter } from '../schema/FunctionRegistry';
-import type { SchemaLoader } from '../schema/SchemaLoader';
+import type { Diagnostic } from "vscode-languageserver";
+import type {
+  FunctionDefinition,
+  FunctionParameter,
+} from "../schema/FunctionRegistry";
+import type { SchemaLoader } from "../schema/SchemaLoader";
 
 /**
  * Lifecycle hooks that extensions can implement to integrate with the language server.
@@ -95,7 +98,7 @@ export interface CompletionContext {
  */
 export interface CompletionItem {
   label: string;
-  kind: 'field' | 'function' | 'keyword' | 'type' | 'variable';
+  kind: "field" | "function" | "keyword" | "type" | "variable";
   detail?: string;
   documentation?: string;
   insertText?: string;
@@ -139,5 +142,5 @@ export interface ExtensionConfig {
   options?: Record<string, unknown>;
 }
 
-export { ExtensionRegistry } from './ExtensionRegistry';
-export { paramTypeAnnotationsExtension } from './paramTypeAnnotations/index';
+export { ExtensionRegistry } from "./ExtensionRegistry";
+export { paramTypeAnnotationsExtension } from "./paramTypeAnnotations/index";

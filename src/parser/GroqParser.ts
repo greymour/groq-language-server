@@ -1,10 +1,16 @@
-import Parser from 'tree-sitter';
-import type { Tree, SyntaxNode, ParseResult, ParseError, Range } from './ASTTypes';
-import { nodeToRange } from './ASTTypes';
-import { collectAllErrors } from './nodeUtils';
+import Parser from "tree-sitter";
+import type {
+  Tree,
+  SyntaxNode,
+  ParseResult,
+  ParseError,
+  Range,
+} from "./ASTTypes";
+import { nodeToRange } from "./ASTTypes";
+import { collectAllErrors } from "./nodeUtils";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const GroqLanguage = require('tree-sitter-groq') as Parser.Language;
+const GroqLanguage = require("tree-sitter-groq") as Parser.Language;
 
 export class GroqParser {
   private parser: Parser;
@@ -58,7 +64,7 @@ export class GroqParser {
 
     if (node.isMissing) {
       message = `Missing ${node.type}`;
-    } else if (node.type === 'ERROR') {
+    } else if (node.type === "ERROR") {
       message = this.inferErrorMessage(node);
     } else {
       message = `Syntax error at ${node.type}`;
@@ -73,25 +79,28 @@ export class GroqParser {
     const prevSibling = errorNode.previousSibling;
 
     if (!text) {
-      return 'Unexpected end of input';
+      return "Unexpected end of input";
     }
 
-    if (parent?.type === 'subscript_expression') {
-      if (prevSibling?.type === '[') {
+    if (parent?.type === "subscript_expression") {
+      if (prevSibling?.type === "[") {
         return `Invalid filter or subscript expression: "${text}"`;
       }
-      return 'Expected closing bracket ]';
+      return "Expected closing bracket ]";
     }
 
-    if (parent?.type === 'projection' || parent?.type === 'projection_expression') {
+    if (
+      parent?.type === "projection" ||
+      parent?.type === "projection_expression"
+    ) {
       return `Invalid projection syntax: "${text}"`;
     }
 
-    if (parent?.type === 'function_call') {
+    if (parent?.type === "function_call") {
       return `Invalid function argument: "${text}"`;
     }
 
-    if (text.startsWith('$')) {
+    if (text.startsWith("$")) {
       return `Invalid variable name: "${text}"`;
     }
 
@@ -100,7 +109,7 @@ export class GroqParser {
     }
 
     if (text === '"' || text === "'") {
-      return 'Unclosed string';
+      return "Unclosed string";
     }
 
     return `Unexpected token: "${text}"`;

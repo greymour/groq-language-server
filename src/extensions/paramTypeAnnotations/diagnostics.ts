@@ -1,6 +1,6 @@
-import type { Diagnostic } from 'vscode-languageserver';
-import { DiagnosticSeverity } from 'vscode-languageserver';
-import type { DiagnosticsContext } from '../index';
+import type { Diagnostic } from "vscode-languageserver";
+import { DiagnosticSeverity } from "vscode-languageserver";
+import type { DiagnosticsContext } from "../index";
 
 /**
  * Validate that all declared parameter types exist in the schema.
@@ -18,16 +18,26 @@ export function validateParamTypes(context: DiagnosticsContext): Diagnostic[] {
     for (const param of funcDef.parameters) {
       if (param.declaredType && !schemaLoader.getType(param.declaredType)) {
         const availableTypes = schemaLoader.getTypeNames();
-        const similarTypes = findSimilarTypes(param.declaredType, availableTypes);
+        const similarTypes = findSimilarTypes(
+          param.declaredType,
+          availableTypes
+        );
         const range = param.typeAnnotationRange
-          ? offsetRangeToLSPRange(source, param.typeAnnotationRange.startIndex, param.typeAnnotationRange.endIndex)
-          : { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+          ? offsetRangeToLSPRange(
+              source,
+              param.typeAnnotationRange.startIndex,
+              param.typeAnnotationRange.endIndex
+            )
+          : {
+              start: { line: 0, character: 0 },
+              end: { line: 0, character: 0 },
+            };
 
         diagnostics.push({
           severity: DiagnosticSeverity.Warning,
           range,
           message: `Type "${param.declaredType}" not found in schema. ${similarTypes}`,
-          source: 'groq-ext:paramTypeAnnotations',
+          source: "groq-ext:paramTypeAnnotations",
         });
       }
     }
@@ -41,11 +51,11 @@ export function validateParamTypes(context: DiagnosticsContext): Diagnostic[] {
  */
 function findSimilarTypes(target: string, availableTypes: string[]): string {
   if (availableTypes.length === 0) {
-    return 'No types available in schema.';
+    return "No types available in schema.";
   }
 
   const targetLower = target.toLowerCase();
-  const scored = availableTypes.map(type => ({
+  const scored = availableTypes.map((type) => ({
     type,
     distance: levenshteinDistance(targetLower, type.toLowerCase()),
   }));
@@ -54,17 +64,20 @@ function findSimilarTypes(target: string, availableTypes: string[]): string {
 
   // Only show types within a reasonable edit distance (half the target length, minimum 5)
   const maxDistance = Math.max(5, Math.floor(target.length / 2));
-  const topMatches = scored.slice(0, 5).filter(s => s.distance <= maxDistance);
+  const topMatches = scored
+    .slice(0, 5)
+    .filter((s) => s.distance <= maxDistance);
   const remaining = availableTypes.length - topMatches.length;
 
   if (topMatches.length === 0) {
     const sample = availableTypes.slice(0, 5);
-    const suffix = remaining > 0 ? ` (and ${availableTypes.length - 5} more)` : '';
-    return `Available types: ${sample.join(', ')}${suffix}`;
+    const suffix =
+      remaining > 0 ? ` (and ${availableTypes.length - 5} more)` : "";
+    return `Available types: ${sample.join(", ")}${suffix}`;
   }
 
-  const suggestions = topMatches.map(s => s.type).join(', ');
-  const suffix = remaining > 0 ? ` (and ${remaining} more)` : '';
+  const suggestions = topMatches.map((s) => s.type).join(", ");
+  const suffix = remaining > 0 ? ` (and ${remaining} more)` : "";
   return `Similar types: ${suggestions}${suffix}`;
 }
 
@@ -91,8 +104,8 @@ function levenshteinDistance(a: string, b: string): number {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       currRow[j] = Math.min(
-        prevRow[j] + 1,      // deletion
-        currRow[j - 1] + 1,  // insertion
+        prevRow[j] + 1, // deletion
+        currRow[j - 1] + 1, // insertion
         prevRow[j - 1] + cost // substitution
       );
     }
@@ -110,7 +123,10 @@ function offsetRangeToLSPRange(
   source: string,
   startOffset: number,
   endOffset: number
-): { start: { line: number; character: number }; end: { line: number; character: number } } {
+): {
+  start: { line: number; character: number };
+  end: { line: number; character: number };
+} {
   let line = 0;
   let character = 0;
   let startLine = 0;
@@ -121,7 +137,7 @@ function offsetRangeToLSPRange(
       startLine = line;
       startCharacter = character;
     }
-    if (source[i] === '\n') {
+    if (source[i] === "\n") {
       line++;
       character = 0;
     } else {
