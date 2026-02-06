@@ -8,6 +8,7 @@ import {
 } from "../../src/extensions/index";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SyntaxNode } from "../../src/parser/ASTTypes.ts";
 
 function createExtensionRegistry(): ExtensionRegistry {
   const registry = new ExtensionRegistry();
@@ -361,7 +362,7 @@ describe("FunctionRegistry with schema", () => {
   });
 });
 
-function findNodeByText(node: any, text: string): any {
+function findNodeByText(node: SyntaxNode, text: string): any {
   if (node.text === text && node.type === "identifier") {
     return node;
   }
