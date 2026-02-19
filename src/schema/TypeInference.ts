@@ -29,6 +29,18 @@ export function inferTypeContextFromText(
 
   const textBeforeCursor = getTextBeforeCursor(source, position);
 
+  // Look for nested object projection pattern: fieldName{
+  // This must be checked before the _type pattern to handle nested projections correctly
+  const nestedType = findNestedProjectionTypeFromText(
+    textBeforeCursor,
+    schemaLoader
+  );
+  if (nestedType) {
+    context.type = nestedType;
+    context.documentTypes = [nestedType.name];
+    return context;
+  }
+
   // Look for array field access pattern: fieldName[]{
   const arrayFieldMatch = textBeforeCursor.match(/(\w+)\[\]\s*\{\s*[^}]*$/);
   if (arrayFieldMatch) {
@@ -56,6 +68,79 @@ export function inferTypeContextFromText(
 
   context.documentTypes = schemaLoader.getDocumentTypeNames();
   return context;
+}
+
+function findNestedProjectionTypeFromText(
+  textBeforeCursor: string,
+  schemaLoader: SchemaLoader
+): ResolvedType | null {
+  // First, find the parent type from _type == "typeName" pattern
+  const typeMatch = textBeforeCursor.match(/_type\s*==\s*["'](\w+)["']/);
+  if (!typeMatch) return null;
+
+  const parentTypeName = typeMatch[1];
+
+  // Find all nested projection patterns: identifier followed by {
+  // We need to track brace nesting to find the innermost unclosed projection
+  const projectionStack: string[] = [];
+  let currentField = "";
+  let inIdentifier = false;
+
+  for (let i = 0; i < textBeforeCursor.length; i++) {
+    const char = textBeforeCursor[i];
+
+    if (/[a-zA-Z_]/.test(char)) {
+      if (!inIdentifier) {
+        currentField = char;
+        inIdentifier = true;
+      } else {
+        currentField += char;
+      }
+    } else if (/[0-9]/.test(char) && inIdentifier) {
+      currentField += char;
+    } else {
+      if (char === "{" && inIdentifier && currentField) {
+        projectionStack.push(currentField);
+      } else if (char === "{") {
+        projectionStack.push("");
+      } else if (char === "}") {
+        projectionStack.pop();
+      }
+      inIdentifier = false;
+      currentField = "";
+    }
+  }
+
+  // If we're inside at least one nested projection (beyond the main type)
+  if (projectionStack.length >= 2) {
+    // Start from parent type and resolve through the chain
+    let currentType = schemaLoader.getType(parentTypeName);
+    if (!currentType) return null;
+
+    // Skip the first empty entry (from the main projection after *[_type == ...]{)
+    for (let i = 1; i < projectionStack.length; i++) {
+      const fieldName = projectionStack[i];
+      if (!fieldName) continue;
+
+      const field = schemaLoader.getField(currentType.name, fieldName);
+      if (!field) return null;
+
+      // Handle reference fields
+      if (field.isReference && field.referenceTargets?.length) {
+        currentType = schemaLoader.getType(field.referenceTargets[0]) ?? null;
+      } else if (field.type && field.type !== "object") {
+        currentType = schemaLoader.getType(field.type) ?? null;
+      } else {
+        return null;
+      }
+
+      if (!currentType) return null;
+    }
+
+    return currentType;
+  }
+
+  return null;
 }
 
 function getTextBeforeCursor(
@@ -437,6 +522,14 @@ function findTypeFilter(node: SyntaxNode): SyntaxNode | null {
             return typeComparison;
           }
         }
+      } else if (
+        baseNode?.type === "identifier" ||
+        baseNode?.type === "dereference_expression"
+      ) {
+        // We're inside a nested field projection (e.g., `fieldName { }` or `fieldName->{ }`)
+        // Don't continue searching for type filters in parent projections -
+        // the type context should come from the field type, not a parent type filter
+        return null;
       }
     }
 

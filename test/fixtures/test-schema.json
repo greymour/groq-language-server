@@ -48,6 +48,36 @@
           "type": "datetime",
           "title": "Published At",
           "description": "Publication date and time"
+        },
+        {
+          "name": "metaInfo",
+          "type": "postMetaInfo",
+          "title": "Meta Info",
+          "description": "SEO and metadata information"
+        }
+      ]
+    },
+    {
+      "name": "postMetaInfo",
+      "type": "object",
+      "title": "Post Meta Info",
+      "description": "SEO and metadata for posts",
+      "fields": [
+        {
+          "name": "seoTitle",
+          "type": "string",
+          "title": "SEO Title"
+        },
+        {
+          "name": "seoDescription",
+          "type": "text",
+          "title": "SEO Description"
+        },
+        {
+          "name": "keywords",
+          "type": "array",
+          "title": "Keywords",
+          "of": [{ "type": "string" }]
         }
       ]
     },

@@ -111,6 +111,46 @@ describe("Schema-aware completions", () => {
     });
   });
 
+  describe("nested projection type context", () => {
+    it("suggests fields from nested object type, not parent type", () => {
+      // metaInfo is a field on post of type postMetaInfo
+      // Inside metaInfo{...}, we should get postMetaInfo fields, not post fields
+      const query = '*[_type == "post"]{ metaInfo{ ';
+      const result = parser.parse(query);
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: query.length },
+        schemaLoader
+      );
+
+      // Should have postMetaInfo fields
+      expect(completions.some((c) => c.label === "seoTitle")).toBe(true);
+      expect(completions.some((c) => c.label === "seoDescription")).toBe(true);
+      expect(completions.some((c) => c.label === "keywords")).toBe(true);
+
+      // Should NOT have post-specific fields (title is only on post, not postMetaInfo)
+      const titleCompletion = completions.find((c) => c.label === "title");
+      expect(titleCompletion).toBeUndefined();
+    });
+
+    it("resolves type context through multiple nesting levels", () => {
+      // Testing that type context is correct inside nested projection
+      const query = '*[_type == "post"]{ ..., metaInfo{ seo';
+      const result = parser.parse(query);
+      const completions = getAutocompleteSuggestions(
+        query,
+        result.tree.rootNode,
+        { line: 0, character: query.length },
+        schemaLoader
+      );
+
+      // Should get seoTitle and seoDescription from postMetaInfo
+      expect(completions.some((c) => c.label === "seoTitle")).toBe(true);
+      expect(completions.some((c) => c.label === "seoDescription")).toBe(true);
+    });
+  });
+
   describe("graceful degradation", () => {
     it("returns static completions without schema", () => {
       const query = '*[_type == "post"]{';
