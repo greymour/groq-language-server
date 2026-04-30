@@ -197,7 +197,7 @@ export class GroqLanguageService {
   }
 
   private isEmbeddedLanguage(uri: string): boolean {
-    return /\.(ts|tsx|js|jsx)$/.test(uri);
+    return /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(uri);
   }
 
   private getEmbeddedDiagnostics(document: TextDocument): Diagnostic[] {

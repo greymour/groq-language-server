@@ -127,9 +127,9 @@ function findNestedProjectionTypeFromText(
 
       // Handle reference fields
       if (field.isReference && field.referenceTargets?.length) {
-        currentType = schemaLoader.getType(field.referenceTargets[0]) ?? null;
+        currentType = schemaLoader.getType(field.referenceTargets[0]);
       } else if (field.type && field.type !== "object") {
-        currentType = schemaLoader.getType(field.type) ?? null;
+        currentType = schemaLoader.getType(field.type);
       } else {
         return null;
       }
